@@ -734,7 +734,28 @@ function renderEntryCart(){
    </div>`;
  }).join('');
  document.querySelectorAll('[data-entry-remove]').forEach(b=>b.onclick=()=>{entryCart=entryCart.filter(i=>i.productId!==b.dataset.entryRemove);renderEntryCart();renderEntryPicker()});
- document.querySelectorAll('[data-entry-qty]').forEach(inp=>inp.oninput=()=>{const i=entryCart.find(x=>x.productId===inp.dataset.entryQty);if(i)i.qty=Math.max(1,Number(inp.value)||1);renderEntryCart()});
+ document.querySelectorAll('[data-entry-qty]').forEach(inp=>{
+   inp.oninput=()=>{
+     const i=entryCart.find(x=>x.productId===inp.dataset.entryQty);
+     if(!i)return;
+     i.qty=inp.value===''?'':Number(inp.value);
+     const p=productById(i.productId);
+     const card=inp.closest('.cart-item');
+     const notice=card?.querySelector('.cart-price');
+     if(notice) notice.innerHTML='Nouveau stock : <strong>'+((p?.stock||0)+(Number(i.qty)||0))+'</strong>';
+   };
+   inp.onblur=()=>{
+     const i=entryCart.find(x=>x.productId===inp.dataset.entryQty);
+     if(!i)return;
+     const q=Number(inp.value);
+     i.qty=q>0?q:1;
+     inp.value=i.qty;
+     const p=productById(i.productId);
+     const card=inp.closest('.cart-item');
+     const notice=card?.querySelector('.cart-price');
+     if(notice) notice.innerHTML='Nouveau stock : <strong>'+((p?.stock||0)+i.qty)+'</strong>';
+   };
+ });
 }
 $('entrySearch').oninput=renderEntryPicker;
 document.querySelectorAll('[data-enext]').forEach(b=>b.onclick=()=>{
@@ -809,7 +830,32 @@ function renderExitCart(){
    </div>`;
  }).join('');
  document.querySelectorAll('[data-exit-remove]').forEach(b=>b.onclick=()=>{exitCart=exitCart.filter(i=>i.productId!==b.dataset.exitRemove);renderExitCart();renderExitPicker();updateExitSaleOptions()});
- document.querySelectorAll('[data-exit-qty]').forEach(inp=>inp.oninput=()=>{const i=exitCart.find(x=>x.productId===inp.dataset.exitQty),p=productById(inp.dataset.exitQty);if(i)i.qty=Math.max(1,Math.min(Number(p?.stock||0),Number(inp.value)||1));renderExitCart();updateExitSaleOptions()});
+ document.querySelectorAll('[data-exit-qty]').forEach(inp=>{
+   inp.oninput=()=>{
+     const i=exitCart.find(x=>x.productId===inp.dataset.exitQty);
+     if(!i)return;
+     i.qty=inp.value===''?'':Number(inp.value);
+     updateExitSaleOptions();
+     const p=productById(i.productId),t=cartItemTotal(i);
+     const card=inp.closest('.cart-item');
+     const notice=card?.querySelector('.cart-price');
+     if(notice) notice.innerHTML='Total produit : <strong>'+money(t.total)+'</strong>';
+   };
+   inp.onblur=()=>{
+     const i=exitCart.find(x=>x.productId===inp.dataset.exitQty),p=productById(inp.dataset.exitQty);
+     if(!i)return;
+     let q=Number(inp.value);
+     if(!Number.isFinite(q)||q<=0) q=1;
+     q=Math.min(q,Number(p?.stock||0));
+     i.qty=q;
+     inp.value=q;
+     updateExitSaleOptions();
+     const t=cartItemTotal(i);
+     const card=inp.closest('.cart-item');
+     const notice=card?.querySelector('.cart-price');
+     if(notice) notice.innerHTML='Total produit : <strong>'+money(t.total)+'</strong>';
+   };
+ });
  document.querySelectorAll('[data-item-discount-type]').forEach(sel=>sel.onchange=()=>{const i=exitCart.find(x=>x.productId===sel.dataset.itemDiscountType);if(i){i.discountType=sel.value;if(sel.value==='NONE')i.discountValue=0}renderExitCart();updateExitSaleOptions()});
  document.querySelectorAll('[data-item-discount-value]').forEach(inp=>inp.oninput=()=>{const i=exitCart.find(x=>x.productId===inp.dataset.itemDiscountValue);if(i)i.discountValue=Math.max(0,Number(inp.value)||0);updateExitSaleOptions()});
 }
