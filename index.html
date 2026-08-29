@@ -292,12 +292,31 @@ tr:last-child td{border-bottom:0}
             </div>
             <div id="saleFields">
               <div class="form-row">
+                <div class="field"><label>Réduction</label>
+                  <select id="discountScope">
+                    <option value="NONE">Aucune réduction</option>
+                    <option value="PRODUCT">Sur ce produit</option>
+                    <option value="GLOBAL">Sur l'ensemble de la vente</option>
+                  </select>
+                </div>
+                <div class="field"><label>Type de réduction</label>
+                  <select id="discountType">
+                    <option value="PERCENT">Pourcentage (%)</option>
+                    <option value="AMOUNT">Montant fixe (F)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-row" id="discountValueRow">
+                <div class="field"><label>Valeur de la réduction</label><input id="discountValue" type="number" min="0" step="1" placeholder="Ex. 10"></div>
+                <div class="field"><label>Économie</label><input id="discountSaved" disabled></div>
+              </div>
+              <div class="form-row">
                 <div class="field"><label>Montant de la vente</label><input id="exitSaleAmount" type="number" min="0" step="1" placeholder="Calcul automatique"></div>
                 <div class="field"><label>Paiement</label>
                   <select id="exitPayment"><option>Espèces</option><option>Mobile Money</option><option>Virement</option><option>Carte</option><option>Crédit</option></select>
                 </div>
               </div>
-              <div class="notice">Le montant est calculé automatiquement avec le prix du produit × quantité. Vous pouvez le modifier en cas de remise.</div>
+              <div class="notice">Le total se calcule automatiquement avec le tarif, la quantité et la réduction choisie. Vous pouvez toujours corriger manuellement le montant final.</div>
             </div>
             <div class="field"><label>Note (facultatif)</label><textarea id="exitNote" rows="3" placeholder="Ex. Livraison cliente Awa"></textarea></div>
             <div class="wizard-actions"><button class="btn secondary" data-xprev>Retour</button><button class="btn" data-xnext>Continuer</button></div>
@@ -495,11 +514,25 @@ function productById(id){return data.products.find(p=>p.id===id)}
 function money(v){return (Number(v)||0).toLocaleString('fr-FR')+' F'}
 function monthKey(d=new Date()){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')}
 function isSaleReason(){return ['Livraison / commande','Vente directe'].includes($('exitReason').value)}
+function calculateDiscount(base){
+ if($('discountScope').value==='NONE') return {discount:0,total:base};
+ const raw=Math.max(0,Number($('discountValue').value)||0);
+ let discount=$('discountType').value==='PERCENT' ? base*Math.min(raw,100)/100 : raw;
+ discount=Math.min(discount,base);
+ return {discount:Math.round(discount),total:Math.max(0,Math.round(base-discount))};
+}
 function updateSaleFields(){
  const p=productById($('exitProduct').value),q=Math.max(0,Number($('exitQty').value)||0);
- $('saleFields').classList.toggle('hidden',!isSaleReason());
- if(isSaleReason()&&p&&q>0&&!$('exitSaleAmount').dataset.manual){
-   $('exitSaleAmount').value=(Number(p.price)||0)*q;
+ const sale=isSaleReason();
+ $('saleFields').classList.toggle('hidden',!sale);
+ const hasDiscount=sale&&$('discountScope').value!=='NONE';
+ $('discountValueRow').classList.toggle('hidden',!hasDiscount);
+ $('discountType').disabled=!hasDiscount;
+ if(sale&&p&&q>0){
+   const base=(Number(p.price)||0)*q;
+   const calc=calculateDiscount(base);
+   $('discountSaved').value=money(calc.discount);
+   if(!$('exitSaleAmount').dataset.manual) $('exitSaleAmount').value=calc.total;
  }
 }
 
@@ -630,14 +663,24 @@ $('confirmEntry').onclick=()=>{
 };
 
 /* EXIT WIZARD */
-function resetExit(){exitStep=1;$('exitProduct').value='';$('exitQty').value='';$('exitNote').value='';$('exitSaleAmount').value='';$('exitSaleAmount').dataset.manual='';$('exitPayment').value='Espèces';$('exitReason').value='Livraison / commande';renderExitStep();updateExitProductInfo();updateSaleFields()}
+function resetExit(){exitStep=1;$('exitProduct').value='';$('exitQty').value='';$('exitNote').value='';$('exitSaleAmount').value='';$('exitSaleAmount').dataset.manual='';$('exitPayment').value='Espèces';$('exitReason').value='Livraison / commande';$('discountScope').value='NONE';$('discountType').value='PERCENT';$('discountValue').value='';$('discountSaved').value='0 F';renderExitStep();updateExitProductInfo();updateSaleFields()}
 function renderExitStep(){
  document.querySelectorAll('[data-exit-panel]').forEach(p=>p.classList.toggle('active',Number(p.dataset.exitPanel)===exitStep));
  document.querySelectorAll('#exitSteps .step').forEach(s=>{const n=Number(s.dataset.step);s.classList.toggle('active',n===exitStep);s.classList.toggle('done',n<exitStep)});
  if(exitStep===3){
   const p=productById($('exitProduct').value),q=Number($('exitQty').value)||0;
   const rows=[['Produit',p?.name||'—'],['Stock actuel',String(p?.stock??'—')],['Quantité retirée','−'+q],['Stock restant',String((p?.stock||0)-q)],['Motif',$('exitReason').value]];
-  if(isSaleReason()){rows.push(['Montant',money(Number($('exitSaleAmount').value)||0)],['Paiement',$('exitPayment').value]);}
+  if(isSaleReason()){
+    const base=(Number(p?.price)||0)*q,calc=calculateDiscount(base);
+    rows.push(['Sous-total',money(base)]);
+    if($('discountScope').value!=='NONE'){
+      rows.push([
+        $('discountScope').value==='PRODUCT'?'Réduction produit':'Réduction globale',
+        '− '+money(calc.discount)
+      ]);
+    }
+    rows.push(['Montant final',money(Number($('exitSaleAmount').value)||0)],['Paiement',$('exitPayment').value]);
+  }
   $('exitSummary').innerHTML=summaryRows(rows);
  }
 }
@@ -648,6 +691,9 @@ function updateExitProductInfo(){
 $('exitProduct').onchange=()=>{updateExitProductInfo();$('exitSaleAmount').dataset.manual='';updateSaleFields()};
 $('exitQty').oninput=()=>{if(!$('exitSaleAmount').dataset.manual) updateSaleFields()};
 $('exitReason').onchange=()=>{$('exitSaleAmount').dataset.manual='';updateSaleFields()};
+$('discountScope').onchange=()=>{$('exitSaleAmount').dataset.manual='';updateSaleFields()};
+$('discountType').onchange=()=>{$('exitSaleAmount').dataset.manual='';updateSaleFields()};
+$('discountValue').oninput=()=>{$('exitSaleAmount').dataset.manual='';updateSaleFields()};
 $('exitSaleAmount').oninput=()=>{$('exitSaleAmount').dataset.manual='1'};
 document.querySelectorAll('[data-xnext]').forEach(b=>b.onclick=()=>{
  const p=productById($('exitProduct').value),q=Number($('exitQty').value)||0;
@@ -665,7 +711,14 @@ $('confirmExit').onclick=()=>{
  data.movements.unshift({id:movementId,productId:p.id,productName:p.name,type:'OUT',qty:q,stockAfter:p.stock,reason:$('exitReason').value,note:$('exitNote').value.trim(),date:now});
  if(isSaleReason()){
    const amount=Math.max(0,Number($('exitSaleAmount').value)||((Number(p.price)||0)*q));
-   data.accounts.unshift({id:uid(),type:'INCOME',label:p.name+(p.format?' ('+p.format+')':''),amount,payment:$('exitPayment').value,note:$('exitNote').value.trim(),date:now,movementId});
+   const baseAmount=(Number(p.price)||0)*q;
+   const calc=calculateDiscount(baseAmount);
+   data.accounts.unshift({
+     id:uid(),type:'INCOME',label:p.name+(p.format?' ('+p.format+')':''),
+     amount,payment:$('exitPayment').value,note:$('exitNote').value.trim(),date:now,movementId,
+     baseAmount,discountScope:$('discountScope').value,discountType:$('discountType').value,
+     discountValue:Number($('discountValue').value)||0,discountAmount:calc.discount
+   });
  }
  save();alert('Sortie enregistrée.');gotoPage('dashboard')
 };
