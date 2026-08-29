@@ -335,6 +335,10 @@ tr:last-child td{border-bottom:0}
                 <div class="field"><label>Valeur</label><input id="globalDiscountValue" type="number" min="0" step="1" placeholder="Ex. 10"></div>
               </div>
               <div class="form-row">
+                <div class="field"><label>Nom du client (facultatif)</label><input id="exitCustomerName" placeholder="Ex. Mme Koné"></div>
+                <div class="field"><label>Téléphone (facultatif)</label><input id="exitCustomerPhone" inputmode="tel" placeholder="Ex. 07 00 00 00 00"></div>
+              </div>
+              <div class="form-row">
                 <div class="field"><label>Paiement</label>
                   <select id="exitPayment"><option>Espèces</option><option>Mobile Money</option><option>Virement</option><option>Carte</option><option>Crédit</option></select>
                 </div>
@@ -408,7 +412,7 @@ tr:last-child td{border-bottom:0}
           </div>
           <div class="table-wrap" style="margin-top:14px">
             <table>
-              <thead><tr><th>Date</th><th>Type</th><th>Détail</th><th>Paiement</th><th>Montant</th></tr></thead>
+              <thead><tr><th>Date</th><th>Type</th><th>Détail</th><th>Paiement</th><th>Montant</th><th>Reçu</th></tr></thead>
               <tbody id="accountingBody"></tbody>
             </table>
           </div>
@@ -907,7 +911,7 @@ $('confirmEntry').onclick=()=>{
 /* EXIT WIZARD */
 function resetExit(){
  exitStep=1;exitCart=[];$('exitSearch').value='';$('exitNote').value='';$('exitReason').value='Livraison / commande';
- $('exitPayment').value='Espèces';$('globalDiscountType').value='NONE';$('globalDiscountValue').value='';
+ $('exitPayment').value='Espèces';$('globalDiscountType').value='NONE';$('globalDiscountValue').value='';$('exitCustomerName').value='';$('exitCustomerPhone').value='';
  renderExitStep();renderExitPicker();updateExitSaleOptions();
 }
 function updateExitSaleOptions(){
@@ -931,6 +935,8 @@ function renderExitStep(){
      if(t.productDiscount)rows.push(['Réductions produits','− '+money(t.productDiscount)]);
      if(t.globalDiscount)rows.push(['Réduction globale','− '+money(t.globalDiscount)]);
      rows.push(['TOTAL',money(t.total)],['Paiement',$('exitPayment').value]);
+     if($('exitCustomerName').value.trim())rows.push(['Client',$('exitCustomerName').value.trim()]);
+     if($('exitCustomerPhone').value.trim())rows.push(['Téléphone',$('exitCustomerPhone').value.trim()]);
    }
    rows.push(['Motif',$('exitReason').value]);
    $('exitSummary').innerHTML=summaryRows(rows);
@@ -1026,6 +1032,7 @@ $('confirmExit').onclick=()=>{
      id:uid(),type:'INCOME',
      label:'Vente de '+exitCart.length+' produit'+(exitCart.length>1?'s':''),
      amount:t.total,payment:$('exitPayment').value,note,date:now,movementIds,
+     customerName:$('exitCustomerName').value.trim(),customerPhone:$('exitCustomerPhone').value.trim(),
      baseAmount:t.subtotal,discountAmount:t.productDiscount+t.globalDiscount,
      items:exitCart.map(i=>{const p=productById(i.productId),t2=cartItemTotal(i);return {productId:i.productId,name:p?.name,format:p?.format,qty:positiveInt(i.qty),unitPrice:p?.price,discountType:i.discountType,discountValue:Number(i.discountValue)||0,discountAmount:t2.discount,total:t2.total}}),
      globalDiscountType:$('globalDiscountType').value,globalDiscountValue:Number($('globalDiscountValue').value)||0,globalDiscountAmount:t.globalDiscount
