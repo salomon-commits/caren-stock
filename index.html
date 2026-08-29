@@ -194,7 +194,7 @@ tr:last-child td{border-bottom:0}
           </div>
           <div class="table-wrap" style="margin-top:14px">
             <table>
-              <thead><tr><th>Produit</th><th>Catégorie</th><th>Stock</th><th>État</th><th>Actions</th></tr></thead>
+              <thead><tr><th>Produit</th><th>Catégorie</th><th>Format</th><th>Prix</th><th>Stock</th><th>État</th><th>Actions</th></tr></thead>
               <tbody id="productsBody"></tbody>
             </table>
           </div>
@@ -351,6 +351,31 @@ tr:last-child td{border-bottom:0}
 (() => {
 const KEY='mon_stock_app_v2';
 const $=id=>document.getElementById(id);
+
+const BASE_CATALOG = [
+  {id:'cat-gel-lactea-opal-500',name:'Gel Douche Lactea Opal',category:'Gel & Savon',format:'500 ml',price:25000},
+  {id:'cat-savon-noir-500',name:'Savon Noir',category:'Gel & Savon',format:'500 g',price:16000},
+  {id:'cat-savon-noir-250',name:'Savon Noir',category:'Gel & Savon',format:'250 g',price:9000},
+  {id:'cat-savon-visage',name:'Savon Visage',category:'Gel & Savon',format:'',price:8000},
+  {id:'cat-lait-lactea-opal-300',name:'Lait Lactea Opal',category:'Lait & Crème',format:'300 ml',price:15500},
+  {id:'cat-lait-lum-300',name:'Lait Lum',category:'Lait & Crème',format:'300 ml',price:15000},
+  {id:'cat-creme-visage-nuit-30',name:'Crème Visage Nuit',category:'Lait & Crème',format:'30 g',price:9000},
+  {id:'cat-creme-visage-jour-30',name:'Crème Visage Jour',category:'Lait & Crème',format:'30 g',price:5000},
+  {id:'cat-beurre-adulte-400',name:'Crème au Beurre Adulte',category:'Beurre',format:'400 g',price:15000},
+  {id:'cat-beurre-enfant-300',name:'Crème au Beurre Enfant',category:'Beurre',format:'300 g',price:12000},
+  {id:'cat-creme-glow-300',name:'Crème Glow Hydratante Corporelle',category:'Beurre',format:'300 g',price:12000},
+  {id:'cat-huile-traditionnelle-250',name:'Huile Traditionnelle',category:'Huile',format:'250 ml',price:12000},
+  {id:'cat-huile-nacree-100',name:'Huile Nacrée (Pailletée)',category:'Huile',format:'100 ml',price:12000},
+  {id:'cat-gamme-lactea',name:'Gamme Lactea',category:'Gamme',format:'',price:61000},
+  {id:'cat-gamme-teint-clair',name:'Gamme Teint Clair',category:'Gamme',format:'',price:51000},
+  {id:'cat-mini-gamme-teint-clair',name:'Mini Gamme Teint Clair',category:'Gamme',format:'',price:44000},
+  {id:'cat-gamme-marron-clair',name:'Gamme Marron Clair',category:'Gamme',format:'',price:51000},
+  {id:'cat-mini-gamme-marron-clair',name:'Mini Gamme Marron Clair',category:'Gamme',format:'',price:44000},
+  {id:'cat-kit-visage',name:'Kit Visage',category:'Gamme',format:'',price:20000},
+  {id:'cat-box-nourrice',name:'Box Nourrice & Femme Enceinte',category:'Box',format:'',price:40000},
+  {id:'cat-box-cadeau-plus-mot',name:'Box Cadeau Plus Mot',category:'Box',format:'',price:50000}
+];
+
 let data=load();
 let productStep=1, entryStep=1, exitStep=1;
 
@@ -364,11 +389,31 @@ const pageMeta={
 };
 
 function load(){
+ let x={products:[],movements:[]};
  try{
-   const x=JSON.parse(localStorage.getItem(KEY));
-   if(x&&Array.isArray(x.products)&&Array.isArray(x.movements)) return x;
+   const saved=JSON.parse(localStorage.getItem(KEY));
+   if(saved&&Array.isArray(saved.products)&&Array.isArray(saved.movements)) x=saved;
  }catch(e){}
- return {products:[],movements:[]};
+
+ if(x.catalogVersion!==1){
+   const key=p=>(String(p.name||'').trim().toLowerCase()+'|'+String(p.format||'').trim().toLowerCase());
+   const existing=new Set(x.products.map(key));
+
+   BASE_CATALOG.forEach(item=>{
+     if(!existing.has(key(item))){
+       x.products.push({
+         ...item,
+         stock:0,
+         threshold:5,
+         createdAt:new Date().toISOString()
+       });
+     }
+   });
+
+   x.catalogVersion=1;
+   localStorage.setItem(KEY,JSON.stringify(x));
+ }
+ return x;
 }
 function save(){localStorage.setItem(KEY,JSON.stringify(data));renderAll()}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
@@ -406,12 +451,12 @@ function renderDashboard(){
 }
 function renderProducts(){
  const q=$('productSearch').value.trim().toLowerCase();
- const items=data.products.filter(p=>(p.name+' '+(p.category||'')).toLowerCase().includes(q));
+ const items=data.products.filter(p=>(p.name+' '+(p.category||'')+' '+(p.format||'')).toLowerCase().includes(q));
  $('productsBody').innerHTML=items.length?items.map(p=>{
    const badge=p.stock===0?'<span class="badge zero">Rupture</span>':p.stock<=p.threshold?'<span class="badge low">Faible</span>':'<span class="badge ok">OK</span>';
-   return `<tr><td><strong>${esc(p.name)}</strong></td><td>${esc(p.category||'—')}</td><td><strong>${p.stock}</strong></td><td>${badge}</td>
+   return `<tr><td><strong>${esc(p.name)}</strong></td><td>${esc(p.category||'—')}</td><td>${esc(p.format||'—')}</td><td><strong>${p.price?Number(p.price).toLocaleString('fr-FR')+' F':'—'}</strong></td><td><strong>${p.stock}</strong></td><td>${badge}</td>
    <td><div class="actions"><button class="btn secondary small" data-edit="${p.id}">Modifier</button><button class="btn danger small" data-del="${p.id}">Supprimer</button></div></td></tr>`
- }).join(''):'<tr><td colspan="5" class="empty">Aucun produit.</td></tr>';
+ }).join(''):'<tr><td colspan="7" class="empty">Aucun produit.</td></tr>';
  document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{
    const p=productById(b.dataset.del); if(!p)return;
    if(confirm(`Supprimer "${p.name}" ?`)){data.products=data.products.filter(x=>x.id!==p.id);save()}
@@ -427,7 +472,7 @@ function renderProducts(){
 $('productSearch').oninput=renderProducts;
 
 function renderSelects(){
- const opts=data.products.length?'<option value="">— Choisir —</option>'+data.products.map(p=>`<option value="${p.id}">${esc(p.name)} — stock ${p.stock}</option>`).join(''):'<option value="">Aucun produit</option>';
+ const opts=data.products.length?'<option value="">— Choisir —</option>'+data.products.map(p=>`<option value="${p.id}">${esc(p.name)}${p.format?' ('+esc(p.format)+')':''} — stock ${p.stock}</option>`).join(''):'<option value="">Aucun produit</option>';
  $('entryProduct').innerHTML=opts;$('exitProduct').innerHTML=opts;
  updateEntryProductInfo();updateExitProductInfo();
 }
@@ -545,7 +590,7 @@ $('restoreInput').onchange=async e=>{
  e.target.value='';
 }
 function csv(rows){return '\uFEFF'+rows.map(r=>r.map(v=>{v=String(v??'');return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(';')).join('\n')}
-$('exportStock').onclick=()=>download(`stock-${dayKey()}.csv`,csv([['Produit','Catégorie','Stock','Seuil'],...data.products.map(p=>[p.name,p.category,p.stock,p.threshold])]),'text/csv;charset=utf-8');
+$('exportStock').onclick=()=>download(`stock-${dayKey()}.csv`,csv([['Produit','Catégorie','Format','Prix','Stock','Seuil'],...data.products.map(p=>[p.name,p.category,p.format||'',p.price||'',p.stock,p.threshold])]),'text/csv;charset=utf-8');
 $('exportHistory').onclick=()=>download(`historique-${dayKey()}.csv`,csv([['Date','Produit','Type','Quantité','Stock après','Motif','Note'],...data.movements.map(m=>[dt(m.date),m.productName,m.type==='IN'?'Entrée':'Sortie',m.qty,m.stockAfter,m.reason,m.note])]),'text/csv;charset=utf-8');
 
 /* INSTALLATION PWA */
