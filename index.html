@@ -109,6 +109,22 @@ tr:last-child td{border-bottom:0}
 .section-title{margin-bottom:6px}.section-sub{margin:0 0 20px;color:var(--muted);font-size:13px}
 .actions{display:flex;gap:6px;flex-wrap:wrap}
 .positive{color:var(--success)}.negative{color:var(--danger)}
+.picker-list{display:grid;gap:9px;max-height:430px;overflow:auto;margin-top:12px}
+.picker-item{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);border-radius:13px;padding:12px;background:#fff}
+.picker-item .info{min-width:0}.picker-item strong{display:block}.picker-item small{color:var(--muted)}
+.cart-list{display:grid;gap:10px}
+.cart-item{border:1px solid var(--line);border-radius:14px;padding:13px;background:#fff}
+.cart-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.cart-top small{color:var(--muted)}
+.cart-controls{display:grid;grid-template-columns:120px 1fr auto;gap:8px;align-items:end;margin-top:10px}
+.cart-discount{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px}
+.selected-count{font-size:12px;color:var(--muted);font-weight:700}
+@media(max-width:560px){
+  .cart-controls{grid-template-columns:1fr auto}
+  .cart-controls .cart-price{grid-column:1/-1}
+  .cart-discount{grid-template-columns:1fr 1fr}
+  .cart-discount .discount-value{grid-column:1/-1}
+}
 .hidden{display:none!important}
 @media(max-width:900px){
   .sidebar{display:none}.main{margin-left:0;width:100%}
@@ -243,26 +259,33 @@ tr:last-child td{border-bottom:0}
       <!-- ENTRY -->
       <section class="page" id="page-entry">
         <h2 class="section-title">Entrée de stock</h2>
-        <p class="section-sub">Ajoutez des unités à un produit existant.</p>
+        <p class="section-sub">Sélectionnez un ou plusieurs produits puis indiquez les quantités reçues.</p>
         <div class="card wizard" style="margin-top:0">
           <div class="steps" id="entrySteps">
-            <div class="step active" data-step="1"><span class="dot">1</span>Produit</div>
-            <div class="step" data-step="2"><span class="dot">2</span>Quantité</div>
+            <div class="step active" data-step="1"><span class="dot">1</span>Produits</div>
+            <div class="step" data-step="2"><span class="dot">2</span>Quantités</div>
             <div class="step" data-step="3"><span class="dot">3</span>Confirmer</div>
           </div>
+
           <div class="wizard-panel active" data-entry-panel="1">
-            <div class="field"><label>Choisir le produit</label><select id="entryProduct"></select></div>
-            <div id="entryProductInfo"></div>
+            <div class="field">
+              <label>Rechercher un produit</label>
+              <input id="entrySearch" placeholder="Nom, catégorie ou format...">
+            </div>
+            <div class="selected-count" id="entrySelectedCount">0 produit sélectionné</div>
+            <div class="picker-list" id="entryProductList"></div>
             <div class="wizard-actions"><span></span><button class="btn" data-enext>Continuer</button></div>
           </div>
+
           <div class="wizard-panel" data-entry-panel="2">
-            <div class="field"><label>Quantité à ajouter</label><input id="entryQty" type="number" min="1" step="1" placeholder="Ex. 20"></div>
-            <div class="field"><label>Motif</label>
+            <div class="cart-list" id="entryCartList"></div>
+            <div class="field" style="margin-top:14px"><label>Motif</label>
               <select id="entryReason"><option>Réapprovisionnement</option><option>Retour client</option><option>Correction</option><option>Autre</option></select>
             </div>
-            <div class="field"><label>Note (facultatif)</label><textarea id="entryNote" rows="3" placeholder="Ex. Arrivage fournisseur"></textarea></div>
+            <div class="field"><label>Note générale (facultatif)</label><textarea id="entryNote" rows="3" placeholder="Ex. Arrivage fournisseur"></textarea></div>
             <div class="wizard-actions"><button class="btn secondary" data-eprev>Retour</button><button class="btn" data-enext>Continuer</button></div>
           </div>
+
           <div class="wizard-panel" data-entry-panel="3">
             <div class="summary" id="entrySummary"></div>
             <div class="wizard-actions"><button class="btn secondary" data-eprev>Retour</button><button class="btn success" id="confirmEntry">Valider l'entrée</button></div>
@@ -273,54 +296,55 @@ tr:last-child td{border-bottom:0}
       <!-- EXIT -->
       <section class="page" id="page-exit">
         <h2 class="section-title">Sortie / Livraison</h2>
-        <p class="section-sub">Retirez les produits qui quittent le stock.</p>
+        <p class="section-sub">Ajoutez plusieurs produits à la même sortie ou à la même vente.</p>
         <div class="card wizard" style="margin-top:0">
           <div class="steps" id="exitSteps">
-            <div class="step active" data-step="1"><span class="dot">1</span>Produit</div>
+            <div class="step active" data-step="1"><span class="dot">1</span>Produits</div>
             <div class="step" data-step="2"><span class="dot">2</span>Sortie</div>
             <div class="step" data-step="3"><span class="dot">3</span>Confirmer</div>
           </div>
+
           <div class="wizard-panel active" data-exit-panel="1">
-            <div class="field"><label>Choisir le produit</label><select id="exitProduct"></select></div>
-            <div id="exitProductInfo"></div>
+            <div class="field">
+              <label>Rechercher un produit</label>
+              <input id="exitSearch" placeholder="Nom, catégorie ou format...">
+            </div>
+            <div class="selected-count" id="exitSelectedCount">0 produit sélectionné</div>
+            <div class="picker-list" id="exitProductList"></div>
             <div class="wizard-actions"><span></span><button class="btn" data-xnext>Continuer</button></div>
           </div>
+
           <div class="wizard-panel" data-exit-panel="2">
-            <div class="field"><label>Quantité à sortir</label><input id="exitQty" type="number" min="1" step="1" placeholder="Ex. 5"></div>
-            <div class="field"><label>Motif</label>
+            <div class="cart-list" id="exitCartList"></div>
+
+            <div class="field" style="margin-top:14px"><label>Motif</label>
               <select id="exitReason"><option>Livraison / commande</option><option>Vente directe</option><option>Produit abîmé</option><option>Perte</option><option>Correction</option><option>Autre</option></select>
             </div>
-            <div id="saleFields">
+
+            <div id="exitSaleOptions">
               <div class="form-row">
-                <div class="field"><label>Réduction</label>
-                  <select id="discountScope">
-                    <option value="NONE">Aucune réduction</option>
-                    <option value="PRODUCT">Sur ce produit</option>
-                    <option value="GLOBAL">Sur l'ensemble de la vente</option>
-                  </select>
-                </div>
-                <div class="field"><label>Type de réduction</label>
-                  <select id="discountType">
+                <div class="field"><label>Réduction sur l'ensemble</label>
+                  <select id="globalDiscountType">
+                    <option value="NONE">Aucune</option>
                     <option value="PERCENT">Pourcentage (%)</option>
                     <option value="AMOUNT">Montant fixe (F)</option>
                   </select>
                 </div>
-              </div>
-              <div class="form-row" id="discountValueRow">
-                <div class="field"><label>Valeur de la réduction</label><input id="discountValue" type="number" min="0" step="1" placeholder="Ex. 10"></div>
-                <div class="field"><label>Économie</label><input id="discountSaved" disabled></div>
+                <div class="field"><label>Valeur</label><input id="globalDiscountValue" type="number" min="0" step="1" placeholder="Ex. 10"></div>
               </div>
               <div class="form-row">
-                <div class="field"><label>Montant de la vente</label><input id="exitSaleAmount" type="number" min="0" step="1" placeholder="Calcul automatique"></div>
                 <div class="field"><label>Paiement</label>
                   <select id="exitPayment"><option>Espèces</option><option>Mobile Money</option><option>Virement</option><option>Carte</option><option>Crédit</option></select>
                 </div>
+                <div class="field"><label>Total final</label><input id="exitSaleAmount" disabled></div>
               </div>
-              <div class="notice">Le total se calcule automatiquement avec le tarif, la quantité et la réduction choisie. Vous pouvez toujours corriger manuellement le montant final.</div>
+              <div class="notice">Chaque produit peut avoir sa propre réduction. Une réduction globale peut ensuite s'appliquer sur le total restant.</div>
             </div>
-            <div class="field"><label>Note (facultatif)</label><textarea id="exitNote" rows="3" placeholder="Ex. Livraison cliente Awa"></textarea></div>
+
+            <div class="field"><label>Note générale (facultatif)</label><textarea id="exitNote" rows="3" placeholder="Ex. Livraison cliente Awa"></textarea></div>
             <div class="wizard-actions"><button class="btn secondary" data-xprev>Retour</button><button class="btn" data-xnext>Continuer</button></div>
           </div>
+
           <div class="wizard-panel" data-exit-panel="3">
             <div class="summary" id="exitSummary"></div>
             <div class="wizard-actions"><button class="btn secondary" data-xprev>Retour</button><button class="btn" id="confirmExit">Valider la sortie</button></div>
@@ -376,8 +400,11 @@ tr:last-child td{border-bottom:0}
         </div>
 
         <div class="card">
-          <div class="card-head"><h2>Opérations récentes</h2><button class="btn secondary small" id="exportAccounting">Exporter CSV</button></div>
-          <div class="table-wrap">
+          <div class="toolbar">
+            <input id="accountingSearch" class="search" placeholder="Rechercher une vente ou dépense...">
+            <button class="btn secondary small" id="exportAccounting">Exporter CSV</button>
+          </div>
+          <div class="table-wrap" style="margin-top:14px">
             <table>
               <thead><tr><th>Date</th><th>Type</th><th>Détail</th><th>Paiement</th><th>Montant</th></tr></thead>
               <tbody id="accountingBody"></tbody>
@@ -451,6 +478,8 @@ const BASE_CATALOG = [
 
 let data=load();
 let productStep=1, entryStep=1, exitStep=1;
+let entryCart=[];
+let exitCart=[];
 
 const pageMeta={
  dashboard:['Accueil','Vue générale du stock'],
@@ -514,26 +543,25 @@ function productById(id){return data.products.find(p=>p.id===id)}
 function money(v){return (Number(v)||0).toLocaleString('fr-FR')+' F'}
 function monthKey(d=new Date()){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')}
 function isSaleReason(){return ['Livraison / commande','Vente directe'].includes($('exitReason').value)}
-function calculateDiscount(base){
- if($('discountScope').value==='NONE') return {discount:0,total:base};
- const raw=Math.max(0,Number($('discountValue').value)||0);
- let discount=$('discountType').value==='PERCENT' ? base*Math.min(raw,100)/100 : raw;
- discount=Math.min(discount,base);
- return {discount:Math.round(discount),total:Math.max(0,Math.round(base-discount))};
+function discountAmount(base,type,value){
+ const v=Math.max(0,Number(value)||0);
+ if(type==='PERCENT') return Math.min(base,Math.round(base*Math.min(v,100)/100));
+ if(type==='AMOUNT') return Math.min(base,v);
+ return 0;
 }
-function updateSaleFields(){
- const p=productById($('exitProduct').value),q=Math.max(0,Number($('exitQty').value)||0);
- const sale=isSaleReason();
- $('saleFields').classList.toggle('hidden',!sale);
- const hasDiscount=sale&&$('discountScope').value!=='NONE';
- $('discountValueRow').classList.toggle('hidden',!hasDiscount);
- $('discountType').disabled=!hasDiscount;
- if(sale&&p&&q>0){
-   const base=(Number(p.price)||0)*q;
-   const calc=calculateDiscount(base);
-   $('discountSaved').value=money(calc.discount);
-   if(!$('exitSaleAmount').dataset.manual) $('exitSaleAmount').value=calc.total;
- }
+function cartItemTotal(item){
+ const p=productById(item.productId);
+ const base=(Number(p?.price)||0)*(Number(item.qty)||0);
+ const discount=discountAmount(base,item.discountType,item.discountValue);
+ return {base,discount,total:Math.max(0,base-discount)};
+}
+function exitTotals(){
+ const itemTotals=exitCart.map(cartItemTotal);
+ const subtotal=itemTotals.reduce((s,x)=>s+x.base,0);
+ const productDiscount=itemTotals.reduce((s,x)=>s+x.discount,0);
+ const afterProducts=subtotal-productDiscount;
+ const globalDiscount=discountAmount(afterProducts,$('globalDiscountType')?.value,$('globalDiscountValue')?.value);
+ return {subtotal,productDiscount,afterProducts,globalDiscount,total:Math.max(0,afterProducts-globalDiscount)};
 }
 
 function gotoPage(page){
@@ -588,9 +616,48 @@ function renderProducts(){
 $('productSearch').oninput=renderProducts;
 
 function renderSelects(){
- const opts=data.products.length?'<option value="">— Choisir —</option>'+data.products.map(p=>`<option value="${p.id}">${esc(p.name)}${p.format?' ('+esc(p.format)+')':''} — stock ${p.stock}</option>`).join(''):'<option value="">Aucun produit</option>';
- $('entryProduct').innerHTML=opts;$('exitProduct').innerHTML=opts;
- updateEntryProductInfo();updateExitProductInfo();
+ renderEntryPicker();
+ renderExitPicker();
+}
+function matchesProduct(p,q){
+ q=String(q||'').trim().toLowerCase();
+ return !q || (p.name+' '+(p.category||'')+' '+(p.format||'')).toLowerCase().includes(q);
+}
+function renderEntryPicker(){
+ if(!$('entryProductList')) return;
+ const q=$('entrySearch')?.value||'';
+ const items=data.products.filter(p=>matchesProduct(p,q));
+ $('entryProductList').innerHTML=items.length?items.map(p=>{
+   const chosen=entryCart.some(i=>i.productId===p.id);
+   return `<div class="picker-item">
+     <div class="info"><strong>${esc(p.name)}</strong><small>${esc(p.format||'—')} • Stock ${p.stock}</small></div>
+     <button class="btn ${chosen?'secondary':''} small" data-entry-add="${p.id}">${chosen?'Retirer':'Ajouter'}</button>
+   </div>`;
+ }).join(''):'<div class="empty">Aucun produit trouvé.</div>';
+ $('entrySelectedCount').textContent=entryCart.length+' produit'+(entryCart.length>1?'s':'')+' sélectionné'+(entryCart.length>1?'s':'');
+ document.querySelectorAll('[data-entry-add]').forEach(b=>b.onclick=()=>{
+   const id=b.dataset.entryAdd,idx=entryCart.findIndex(i=>i.productId===id);
+   if(idx>=0) entryCart.splice(idx,1); else entryCart.push({productId:id,qty:1});
+   renderEntryPicker();
+ });
+}
+function renderExitPicker(){
+ if(!$('exitProductList')) return;
+ const q=$('exitSearch')?.value||'';
+ const items=data.products.filter(p=>matchesProduct(p,q));
+ $('exitProductList').innerHTML=items.length?items.map(p=>{
+   const chosen=exitCart.some(i=>i.productId===p.id);
+   return `<div class="picker-item">
+     <div class="info"><strong>${esc(p.name)}</strong><small>${esc(p.format||'—')} • ${money(p.price)} • Stock ${p.stock}</small></div>
+     <button class="btn ${chosen?'secondary':''} small" data-exit-add="${p.id}">${chosen?'Retirer':'Ajouter'}</button>
+   </div>`;
+ }).join(''):'<div class="empty">Aucun produit trouvé.</div>';
+ $('exitSelectedCount').textContent=exitCart.length+' produit'+(exitCart.length>1?'s':'')+' sélectionné'+(exitCart.length>1?'s':'');
+ document.querySelectorAll('[data-exit-add]').forEach(b=>b.onclick=()=>{
+   const id=b.dataset.exitAdd,idx=exitCart.findIndex(i=>i.productId===id);
+   if(idx>=0) exitCart.splice(idx,1); else exitCart.push({productId:id,qty:1,discountType:'NONE',discountValue:0});
+   renderExitPicker();
+ });
 }
 function renderHistory(){
  const type=$('historyType').value;
@@ -636,98 +703,163 @@ $('confirmAddProduct').onclick=()=>{
 };
 
 /* ENTRY WIZARD */
-function resetEntry(){entryStep=1;$('entryProduct').value='';$('entryQty').value='';$('entryNote').value='';renderEntryStep();updateEntryProductInfo()}
+function resetEntry(){
+ entryStep=1;entryCart=[];$('entrySearch').value='';$('entryNote').value='';$('entryReason').value='Réapprovisionnement';
+ renderEntryStep();renderEntryPicker();
+}
 function renderEntryStep(){
  document.querySelectorAll('[data-entry-panel]').forEach(p=>p.classList.toggle('active',Number(p.dataset.entryPanel)===entryStep));
  document.querySelectorAll('#entrySteps .step').forEach(s=>{const n=Number(s.dataset.step);s.classList.toggle('active',n===entryStep);s.classList.toggle('done',n<entryStep)});
+ if(entryStep===2) renderEntryCart();
  if(entryStep===3){
-  const p=productById($('entryProduct').value),q=Number($('entryQty').value)||0;
-  $('entrySummary').innerHTML=summaryRows([['Produit',p?.name||'—'],['Stock actuel',String(p?.stock??'—')],['Quantité ajoutée','+'+q],['Nouveau stock',String((p?.stock||0)+q)],['Motif',$('entryReason').value]]);
+   const rows=entryCart.map(i=>{
+     const p=productById(i.productId);
+     return [p?.name+(p?.format?' ('+p.format+')':''), '+'+i.qty+' → stock '+((p?.stock||0)+Number(i.qty||0))];
+   });
+   rows.push(['Motif',$('entryReason').value]);
+   $('entrySummary').innerHTML=summaryRows(rows);
  }
 }
-function updateEntryProductInfo(){
- const p=productById($('entryProduct').value);
- $('entryProductInfo').innerHTML=p?`<div class="notice">Stock actuel : <strong>${p.stock}</strong> unités</div>`:'';
+function renderEntryCart(){
+ $('entryCartList').innerHTML=entryCart.map(i=>{
+   const p=productById(i.productId);
+   return `<div class="cart-item">
+     <div class="cart-top"><div><strong>${esc(p?.name||'')}</strong><br><small>${esc(p?.format||'—')} • Stock actuel ${p?.stock||0}</small></div>
+     <button class="btn danger small" data-entry-remove="${i.productId}">Retirer</button></div>
+     <div class="cart-controls">
+       <div><label>Quantité</label><input type="number" min="1" step="1" value="${i.qty}" data-entry-qty="${i.productId}"></div>
+       <div class="cart-price notice">Nouveau stock : <strong>${(p?.stock||0)+Number(i.qty||0)}</strong></div>
+       <span></span>
+     </div>
+   </div>`;
+ }).join('');
+ document.querySelectorAll('[data-entry-remove]').forEach(b=>b.onclick=()=>{entryCart=entryCart.filter(i=>i.productId!==b.dataset.entryRemove);renderEntryCart();renderEntryPicker()});
+ document.querySelectorAll('[data-entry-qty]').forEach(inp=>inp.oninput=()=>{const i=entryCart.find(x=>x.productId===inp.dataset.entryQty);if(i)i.qty=Math.max(1,Number(inp.value)||1);renderEntryCart()});
 }
-$('entryProduct').onchange=updateEntryProductInfo;
+$('entrySearch').oninput=renderEntryPicker;
 document.querySelectorAll('[data-enext]').forEach(b=>b.onclick=()=>{
- if(entryStep===1&&!productById($('entryProduct').value)){alert('Choisissez un produit.');return}
- if(entryStep===2&&Number($('entryQty').value)<=0){alert('Entrez une quantité valide.');return}
+ if(entryStep===1&&entryCart.length===0){alert('Sélectionnez au moins un produit.');return}
+ if(entryStep===2&&entryCart.some(i=>Number(i.qty)<=0)){alert('Vérifiez les quantités.');return}
  entryStep=Math.min(3,entryStep+1);renderEntryStep()
 });
 document.querySelectorAll('[data-eprev]').forEach(b=>b.onclick=()=>{entryStep=Math.max(1,entryStep-1);renderEntryStep()});
 $('confirmEntry').onclick=()=>{
- const p=productById($('entryProduct').value),q=Number($('entryQty').value);if(!p||q<=0)return;
- p.stock+=q;data.movements.unshift({id:uid(),productId:p.id,productName:p.name,type:'IN',qty:q,stockAfter:p.stock,reason:$('entryReason').value,note:$('entryNote').value.trim(),date:new Date().toISOString()});
- save();alert('Entrée enregistrée.');gotoPage('dashboard')
+ if(!entryCart.length)return;
+ const now=new Date().toISOString(),reason=$('entryReason').value,note=$('entryNote').value.trim();
+ entryCart.forEach(i=>{
+   const p=productById(i.productId),q=Math.max(1,Number(i.qty)||1);
+   if(!p)return;
+   p.stock+=q;
+   data.movements.unshift({id:uid(),productId:p.id,productName:p.name,type:'IN',qty:q,stockAfter:p.stock,reason,note,date:now});
+ });
+ save();alert('Entrée de '+entryCart.length+' produit'+(entryCart.length>1?'s':'')+' enregistrée.');gotoPage('dashboard')
 };
 
 /* EXIT WIZARD */
-function resetExit(){exitStep=1;$('exitProduct').value='';$('exitQty').value='';$('exitNote').value='';$('exitSaleAmount').value='';$('exitSaleAmount').dataset.manual='';$('exitPayment').value='Espèces';$('exitReason').value='Livraison / commande';$('discountScope').value='NONE';$('discountType').value='PERCENT';$('discountValue').value='';$('discountSaved').value='0 F';renderExitStep();updateExitProductInfo();updateSaleFields()}
+function resetExit(){
+ exitStep=1;exitCart=[];$('exitSearch').value='';$('exitNote').value='';$('exitReason').value='Livraison / commande';
+ $('exitPayment').value='Espèces';$('globalDiscountType').value='NONE';$('globalDiscountValue').value='';
+ renderExitStep();renderExitPicker();updateExitSaleOptions();
+}
+function updateExitSaleOptions(){
+ const sale=isSaleReason();
+ $('exitSaleOptions').classList.toggle('hidden',!sale);
+ if(sale){const t=exitTotals();$('exitSaleAmount').value=money(t.total)}
+}
 function renderExitStep(){
  document.querySelectorAll('[data-exit-panel]').forEach(p=>p.classList.toggle('active',Number(p.dataset.exitPanel)===exitStep));
  document.querySelectorAll('#exitSteps .step').forEach(s=>{const n=Number(s.dataset.step);s.classList.toggle('active',n===exitStep);s.classList.toggle('done',n<exitStep)});
+ if(exitStep===2){renderExitCart();updateExitSaleOptions()}
  if(exitStep===3){
-  const p=productById($('exitProduct').value),q=Number($('exitQty').value)||0;
-  const rows=[['Produit',p?.name||'—'],['Stock actuel',String(p?.stock??'—')],['Quantité retirée','−'+q],['Stock restant',String((p?.stock||0)-q)],['Motif',$('exitReason').value]];
-  if(isSaleReason()){
-    const base=(Number(p?.price)||0)*q,calc=calculateDiscount(base);
-    rows.push(['Sous-total',money(base)]);
-    if($('discountScope').value!=='NONE'){
-      rows.push([
-        $('discountScope').value==='PRODUCT'?'Réduction produit':'Réduction globale',
-        '− '+money(calc.discount)
-      ]);
-    }
-    rows.push(['Montant final',money(Number($('exitSaleAmount').value)||0)],['Paiement',$('exitPayment').value]);
-  }
-  $('exitSummary').innerHTML=summaryRows(rows);
+   const rows=exitCart.map(i=>{
+     const p=productById(i.productId),t=cartItemTotal(i);
+     const d=t.discount?' • remise '+money(t.discount):'';
+     return [p?.name+(p?.format?' ('+p.format+')':''), i.qty+' × '+money(p?.price)+' = '+money(t.total)+d];
+   });
+   if(isSaleReason()){
+     const t=exitTotals();
+     rows.push(['Sous-total',money(t.subtotal)]);
+     if(t.productDiscount)rows.push(['Réductions produits','− '+money(t.productDiscount)]);
+     if(t.globalDiscount)rows.push(['Réduction globale','− '+money(t.globalDiscount)]);
+     rows.push(['TOTAL',money(t.total)],['Paiement',$('exitPayment').value]);
+   }
+   rows.push(['Motif',$('exitReason').value]);
+   $('exitSummary').innerHTML=summaryRows(rows);
  }
 }
-function updateExitProductInfo(){
- const p=productById($('exitProduct').value);
- $('exitProductInfo').innerHTML=p?`<div class="notice ${p.stock===0?'warning':''}">Stock disponible : <strong>${p.stock}</strong> unités</div>`:'';
+function renderExitCart(){
+ $('exitCartList').innerHTML=exitCart.map(i=>{
+   const p=productById(i.productId),t=cartItemTotal(i);
+   return `<div class="cart-item">
+     <div class="cart-top"><div><strong>${esc(p?.name||'')}</strong><br><small>${esc(p?.format||'—')} • ${money(p?.price)} • Stock ${p?.stock||0}</small></div>
+     <button class="btn danger small" data-exit-remove="${i.productId}">Retirer</button></div>
+     <div class="cart-controls">
+       <div><label>Quantité</label><input type="number" min="1" max="${p?.stock||0}" step="1" value="${i.qty}" data-exit-qty="${i.productId}"></div>
+       <div class="cart-price notice">Total produit : <strong>${money(t.total)}</strong></div><span></span>
+     </div>
+     <div class="cart-discount">
+       <div><label>Réduction produit</label><select data-item-discount-type="${i.productId}">
+         <option value="NONE" ${i.discountType==='NONE'?'selected':''}>Aucune</option>
+         <option value="PERCENT" ${i.discountType==='PERCENT'?'selected':''}>Pourcentage (%)</option>
+         <option value="AMOUNT" ${i.discountType==='AMOUNT'?'selected':''}>Montant fixe (F)</option>
+       </select></div>
+       <div class="discount-value"><label>Valeur</label><input type="number" min="0" step="1" value="${i.discountValue||''}" data-item-discount-value="${i.productId}" ${i.discountType==='NONE'?'disabled':''}></div>
+       <div><label>Économie</label><input disabled value="${money(t.discount)}"></div>
+     </div>
+   </div>`;
+ }).join('');
+ document.querySelectorAll('[data-exit-remove]').forEach(b=>b.onclick=()=>{exitCart=exitCart.filter(i=>i.productId!==b.dataset.exitRemove);renderExitCart();renderExitPicker();updateExitSaleOptions()});
+ document.querySelectorAll('[data-exit-qty]').forEach(inp=>inp.oninput=()=>{const i=exitCart.find(x=>x.productId===inp.dataset.exitQty),p=productById(inp.dataset.exitQty);if(i)i.qty=Math.max(1,Math.min(Number(p?.stock||0),Number(inp.value)||1));renderExitCart();updateExitSaleOptions()});
+ document.querySelectorAll('[data-item-discount-type]').forEach(sel=>sel.onchange=()=>{const i=exitCart.find(x=>x.productId===sel.dataset.itemDiscountType);if(i){i.discountType=sel.value;if(sel.value==='NONE')i.discountValue=0}renderExitCart();updateExitSaleOptions()});
+ document.querySelectorAll('[data-item-discount-value]').forEach(inp=>inp.oninput=()=>{const i=exitCart.find(x=>x.productId===inp.dataset.itemDiscountValue);if(i)i.discountValue=Math.max(0,Number(inp.value)||0);updateExitSaleOptions()});
 }
-$('exitProduct').onchange=()=>{updateExitProductInfo();$('exitSaleAmount').dataset.manual='';updateSaleFields()};
-$('exitQty').oninput=()=>{if(!$('exitSaleAmount').dataset.manual) updateSaleFields()};
-$('exitReason').onchange=()=>{$('exitSaleAmount').dataset.manual='';updateSaleFields()};
-$('discountScope').onchange=()=>{$('exitSaleAmount').dataset.manual='';updateSaleFields()};
-$('discountType').onchange=()=>{$('exitSaleAmount').dataset.manual='';updateSaleFields()};
-$('discountValue').oninput=()=>{$('exitSaleAmount').dataset.manual='';updateSaleFields()};
-$('exitSaleAmount').oninput=()=>{$('exitSaleAmount').dataset.manual='1'};
+$('exitSearch').oninput=renderExitPicker;
+$('exitReason').onchange=updateExitSaleOptions;
+$('globalDiscountType').onchange=updateExitSaleOptions;
+$('globalDiscountValue').oninput=updateExitSaleOptions;
 document.querySelectorAll('[data-xnext]').forEach(b=>b.onclick=()=>{
- const p=productById($('exitProduct').value),q=Number($('exitQty').value)||0;
- if(exitStep===1&&!p){alert('Choisissez un produit.');return}
- if(exitStep===2&&(q<=0)){alert('Entrez une quantité valide.');return}
- if(exitStep===2&&p&&q>p.stock){alert(`Stock insuffisant. Il reste ${p.stock} unités.`);return}
+ if(exitStep===1&&exitCart.length===0){alert('Sélectionnez au moins un produit.');return}
+ if(exitStep===2){
+   for(const i of exitCart){
+     const p=productById(i.productId),q=Number(i.qty)||0;
+     if(q<=0){alert('Vérifiez les quantités.');return}
+     if(q>Number(p?.stock||0)){alert('Stock insuffisant pour '+(p?.name||'un produit')+'. Disponible : '+(p?.stock||0));return}
+   }
+ }
  exitStep=Math.min(3,exitStep+1);renderExitStep()
 });
 document.querySelectorAll('[data-xprev]').forEach(b=>b.onclick=()=>{exitStep=Math.max(1,exitStep-1);renderExitStep()});
 $('confirmExit').onclick=()=>{
- const p=productById($('exitProduct').value),q=Number($('exitQty').value);if(!p||q<=0||q>p.stock)return;
- const now=new Date().toISOString();
- p.stock-=q;
- const movementId=uid();
- data.movements.unshift({id:movementId,productId:p.id,productName:p.name,type:'OUT',qty:q,stockAfter:p.stock,reason:$('exitReason').value,note:$('exitNote').value.trim(),date:now});
+ if(!exitCart.length)return;
+ for(const i of exitCart){const p=productById(i.productId);if(Number(i.qty)>Number(p?.stock||0)){alert('Stock insuffisant pour '+(p?.name||''));return}}
+ const now=new Date().toISOString(),reason=$('exitReason').value,note=$('exitNote').value.trim();
+ const movementIds=[];
+ exitCart.forEach(i=>{
+   const p=productById(i.productId),q=Math.max(1,Number(i.qty)||1);
+   p.stock-=q;
+   const movementId=uid();movementIds.push(movementId);
+   data.movements.unshift({id:movementId,productId:p.id,productName:p.name,type:'OUT',qty:q,stockAfter:p.stock,reason,note,date:now});
+ });
  if(isSaleReason()){
-   const amount=Math.max(0,Number($('exitSaleAmount').value)||((Number(p.price)||0)*q));
-   const baseAmount=(Number(p.price)||0)*q;
-   const calc=calculateDiscount(baseAmount);
+   const t=exitTotals();
    data.accounts.unshift({
-     id:uid(),type:'INCOME',label:p.name+(p.format?' ('+p.format+')':''),
-     amount,payment:$('exitPayment').value,note:$('exitNote').value.trim(),date:now,movementId,
-     baseAmount,discountScope:$('discountScope').value,discountType:$('discountType').value,
-     discountValue:Number($('discountValue').value)||0,discountAmount:calc.discount
+     id:uid(),type:'INCOME',
+     label:'Vente de '+exitCart.length+' produit'+(exitCart.length>1?'s':''),
+     amount:t.total,payment:$('exitPayment').value,note,date:now,movementIds,
+     baseAmount:t.subtotal,discountAmount:t.productDiscount+t.globalDiscount,
+     items:exitCart.map(i=>{const p=productById(i.productId),t2=cartItemTotal(i);return {productId:i.productId,name:p?.name,format:p?.format,qty:i.qty,unitPrice:p?.price,discountType:i.discountType,discountValue:i.discountValue,discountAmount:t2.discount,total:t2.total}}),
+     globalDiscountType:$('globalDiscountType').value,globalDiscountValue:Number($('globalDiscountValue').value)||0,globalDiscountAmount:t.globalDiscount
    });
  }
- save();alert('Sortie enregistrée.');gotoPage('dashboard')
+ save();alert('Sortie de '+exitCart.length+' produit'+(exitCart.length>1?'s':'')+' enregistrée.');gotoPage('dashboard')
 };
 
 function summaryRows(rows){return rows.map(x=>`<div class="summary-row"><span>${esc(x[0])}</span><strong>${esc(x[1])}</strong></div>`).join('')}
 
 /* MINI COMPTABILITÉ */
 function renderAccounting(){
- const accounts=Array.isArray(data.accounts)?data.accounts:[];
+ const q=String($('accountingSearch')?.value||'').trim().toLowerCase();
+ const accounts=(Array.isArray(data.accounts)?data.accounts:[]).filter(a=>!q||((a.label||'')+' '+(a.note||'')+' '+(a.payment||'')).toLowerCase().includes(q));
  const today=dayKey(),month=monthKey();
  const todaySales=accounts.filter(a=>a.type==='INCOME'&&dayKey(new Date(a.date))===today).reduce((s,a)=>s+Number(a.amount||0),0);
  const monthSales=accounts.filter(a=>a.type==='INCOME'&&monthKey(new Date(a.date))===month).reduce((s,a)=>s+Number(a.amount||0),0);
@@ -745,6 +877,8 @@ function renderAccounting(){
      <td class="${a.type==='INCOME'?'positive':'negative'}"><strong>${a.type==='INCOME'?'+':'−'}${money(a.amount)}</strong></td>
    </tr>`).join(''):'<tr><td colspan="5" class="empty">Aucune opération comptable.</td></tr>';
 }
+
+$('accountingSearch').oninput=renderAccounting;
 
 $('addExpenseBtn').onclick=()=>{
  const label=$('expenseLabel').value.trim(),amount=Math.max(0,Number($('expenseAmount').value)||0);
