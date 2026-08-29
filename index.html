@@ -1038,11 +1038,56 @@ $('confirmExit').onclick=()=>{
      globalDiscountType:$('globalDiscountType').value,globalDiscountValue:Number($('globalDiscountValue').value)||0,globalDiscountAmount:t.globalDiscount
    });
  }
- if(save(draft)){alert('Sortie de '+exitCart.length+' produit'+(exitCart.length>1?'s':'')+' enregistrée.');gotoPage('dashboard')}
+ if(save(draft)){
+   const saleRecord=isSaleReason()?draft.accounts[0]:null;
+   if(saleRecord&&confirm('Vente enregistrée. Imprimer le reçu maintenant ?'))printReceipt(saleRecord);
+   else alert('Sortie de '+exitCart.length+' produit'+(exitCart.length>1?'s':'')+' enregistrée.');
+   gotoPage('dashboard');
+ }
  btn.dataset.busy='';btn.disabled=false;
 };
 
 function summaryRows(rows){return rows.map(x=>`<div class="summary-row"><span>${esc(x[0])}</span><strong>${esc(x[1])}</strong></div>`).join('')}
+
+
+/* REÇUS CLIENTS */
+function receiptNumber(a){
+ const d=new Date(a.date);
+ return 'REC-'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'-'+String(a.id||'').slice(-6).toUpperCase();
+}
+function printReceipt(a){
+ if(!a||a.type!=='INCOME')return;
+ const items=Array.isArray(a.items)?a.items:[];
+ let itemRows='';
+ if(items.length){
+   itemRows=items.map(i=>{
+     const label=esc((i.name||'Produit')+(i.format?' ('+i.format+')':''));
+     const q=Number(i.qty)||0,up=Number(i.unitPrice)||0,total=Number(i.total)||q*up;
+     return '<tr><td>'+label+'</td><td style="text-align:center">'+q+'</td><td style="text-align:right">'+money(up)+'</td><td style="text-align:right">'+money(total)+'</td></tr>';
+   }).join('');
+ }else{
+   itemRows='<tr><td colspan="4">'+esc(a.label||'Vente')+'</td></tr>';
+ }
+ const discount=Number(a.discountAmount)||0;
+ const html='<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Reçu '+receiptNumber(a)+'</title>'+
+ '<style>body{font-family:Arial,sans-serif;margin:0;padding:18px;color:#111;font-size:13px}.receipt{max-width:380px;margin:auto}.center{text-align:center}.muted{color:#666}.line{border-top:1px dashed #999;margin:12px 0}h1{font-size:20px;margin:0 0 4px}table{width:100%;border-collapse:collapse}th,td{padding:7px 3px;border-bottom:1px solid #eee;font-size:12px}th{text-align:left}.row{display:flex;justify-content:space-between;padding:4px 0}.total{font-size:17px;font-weight:700;border-top:2px solid #111;padding-top:8px;margin-top:5px}.no-print{margin-top:18px;text-align:center}.btn{padding:10px 16px;border:0;background:#111;color:#fff;border-radius:8px;font-weight:700}@media print{body{padding:0}.no-print{display:none}@page{margin:8mm}}</style></head><body><div class="receipt">'+
+ '<div class="center"><h1>CARÈNE</h1><div class="muted">Reçu de vente</div></div><div class="line"></div>'+
+ '<div><strong>N° :</strong> '+receiptNumber(a)+'</div><div><strong>Date :</strong> '+dt(a.date)+'</div>'+
+ (a.customerName?'<div><strong>Client :</strong> '+esc(a.customerName)+'</div>':'')+
+ (a.customerPhone?'<div><strong>Téléphone :</strong> '+esc(a.customerPhone)+'</div>':'')+
+ '<div><strong>Paiement :</strong> '+esc(a.payment||'—')+'</div><div class="line"></div>'+
+ '<table><thead><tr><th>Produit</th><th style="text-align:center">Qté</th><th style="text-align:right">PU</th><th style="text-align:right">Total</th></tr></thead><tbody>'+itemRows+'</tbody></table>'+
+ '<div class="row"><span>Sous-total</span><strong>'+money(Number(a.baseAmount)||Number(a.amount)||0)+'</strong></div>'+
+ (discount?'<div class="row"><span>Réduction</span><strong>− '+money(discount)+'</strong></div>':'')+
+ '<div class="row total"><span>TOTAL PAYÉ</span><span>'+money(a.amount)+'</span></div>'+
+ (a.note?'<div class="line"></div><div><strong>Note :</strong> '+esc(a.note)+'</div>':'')+
+ '<div class="line"></div><div class="center muted">Merci pour votre achat.</div>'+
+ '<div class="no-print"><button class="btn" onclick="window.print()">Imprimer / Enregistrer PDF</button></div>'+
+ '</div></body></html>';
+ const w=window.open('','_blank','width=420,height=700');
+ if(!w){alert("Le navigateur a bloqué l'ouverture du reçu. Autorisez les fenêtres contextuelles.");return}
+ w.document.open();w.document.write(html);w.document.close();w.focus();
+}
 
 /* MINI COMPTABILITÉ */
 function renderAccounting(){
@@ -1064,7 +1109,9 @@ function renderAccounting(){
      <td><strong>${esc(a.label||'—')}</strong>${a.note?'<br><small style="color:var(--muted)">'+esc(a.note)+'</small>':''}</td>
      <td>${esc(a.payment||'—')}</td>
      <td class="${a.type==='INCOME'?'positive':'negative'}"><strong>${a.type==='INCOME'?'+':'−'}${money(a.amount)}</strong></td>
-   </tr>`).join(''):'<tr><td colspan="5" class="empty">Aucune opération comptable.</td></tr>';
+     <td>${a.type==='INCOME'?'<button class="btn secondary small" data-receipt="'+a.id+'">Imprimer</button>':'—'}</td>
+   </tr>`).join(''):'<tr><td colspan="6" class="empty">Aucune opération comptable.</td></tr>';
+ document.querySelectorAll('[data-receipt]').forEach(b=>b.onclick=()=>{const a=(data.accounts||[]).find(x=>x.id===b.dataset.receipt);if(a)printReceipt(a)});
 }
 
 $('accountingSearch').oninput=renderAccounting;
