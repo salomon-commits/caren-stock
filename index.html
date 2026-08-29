@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mon Stock</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#111827">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Stock">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
 <style>
 :root{
   --bg:#f5f7fb;--surface:#ffffff;--surface2:#f9fafb;--text:#111827;--muted:#6b7280;
@@ -144,7 +151,10 @@ tr:last-child td{border-bottom:0}
   <div class="main">
     <header class="topbar">
       <div><h1 id="pageTitle">Accueil</h1><p id="pageSubtitle">Vue générale du stock</p></div>
-      <button class="btn secondary small" id="quickBackup">Sauvegarder</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn small" id="installAppBtn" hidden>Installer</button>
+        <button class="btn secondary small" id="quickBackup">Sauvegarder</button>
+      </div>
     </header>
 
     <main class="content">
@@ -537,6 +547,69 @@ $('restoreInput').onchange=async e=>{
 function csv(rows){return '\uFEFF'+rows.map(r=>r.map(v=>{v=String(v??'');return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(';')).join('\n')}
 $('exportStock').onclick=()=>download(`stock-${dayKey()}.csv`,csv([['Produit','Catégorie','Stock','Seuil'],...data.products.map(p=>[p.name,p.category,p.stock,p.threshold])]),'text/csv;charset=utf-8');
 $('exportHistory').onclick=()=>download(`historique-${dayKey()}.csv`,csv([['Date','Produit','Type','Quantité','Stock après','Motif','Note'],...data.movements.map(m=>[dt(m.date),m.productName,m.type==='IN'?'Entrée':'Sortie',m.qty,m.stockAfter,m.reason,m.note])]),'text/csv;charset=utf-8');
+
+/* INSTALLATION PWA */
+let deferredInstallPrompt = null;
+const installAppBtn = $('installAppBtn');
+
+window.addEventListener('beforeinstallprompt', event => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  installAppBtn.hidden = false;
+});
+
+installAppBtn.addEventListener('click', async () => {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  installAppBtn.hidden = true;
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  installAppBtn.hidden = true;
+});
+
+/* SERVICE WORKER + MISE À JOUR AUTOMATIQUE */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    try {
+      let controllerSeen = !!navigator.serviceWorker.controller;
+      let reloading = false;
+
+      const registration = await navigator.serviceWorker.register('./service-worker.js', {
+        scope: './',
+        updateViaCache: 'none'
+      });
+
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!controllerSeen) {
+          controllerSeen = true;
+          return;
+        }
+        if (!reloading) {
+          reloading = true;
+          window.location.reload();
+        }
+      });
+
+      await registration.update();
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          registration.update().catch(() => {});
+        }
+      });
+
+      window.addEventListener('pageshow', () => {
+        registration.update().catch(() => {});
+      });
+    } catch (error) {
+      console.error('PWA:', error);
+    }
+  });
+}
 
 renderAll();
 })();
