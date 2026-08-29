@@ -343,7 +343,7 @@ tr:last-child td{border-bottom:0}
                 <div class="field"><label>Prix de la livraison</label><input id="exitDeliveryPrice" type="number" min="0" step="1" value="0" placeholder="Ex. 2000"></div>
               </div>
               <div class="form-row">
-                <div class="field"><label>Date de la vente / livraison</label><input id="exitSaleDate" type="datetime-local"></div>
+                <div class="field"><label>Jour de livraison</label><input id="exitSaleDate" type="date"></div>
                 <div class="field"><label>Paiement</label>
                   <select id="exitPayment"><option>Espèces</option><option>Mobile Money</option><option>Virement</option><option>Carte</option><option>Crédit</option></select>
                 </div>
@@ -606,9 +606,13 @@ function dayKey(d=new Date()){return d.getFullYear()+'-'+String(d.getMonth()+1).
 function productById(id){return data.products.find(p=>p.id===id)}
 function money(v){return (Number(v)||0).toLocaleString('fr-FR')+' F'}
 function monthKey(d=new Date()){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')}
-function localDateTimeValue(d){
+function localDateValue(d){
  const p=n=>String(n).padStart(2,'0');
- return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes());
+ return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+}
+function deliveryDateISO(v){
+ if(!v)return new Date().toISOString();
+ return new Date(v+'T12:00:00').toISOString();
 }
 function isSaleReason(){return ['Livraison / commande','Vente directe'].includes($('exitReason').value)}
 function discountAmount(base,type,value){
@@ -933,7 +937,7 @@ $('confirmEntry').onclick=()=>{
 /* EXIT WIZARD */
 function resetExit(){
  exitStep=1;exitCart=[];$('exitSearch').value='';$('exitNote').value='';$('exitReason').value='Livraison / commande';
- $('exitPayment').value='Espèces';$('globalDiscountType').value='NONE';$('globalDiscountValue').value='';$('exitCustomerName').value='';$('exitCustomerPhone').value='';$('exitDeliveryLocation').value='';$('exitDeliveryPrice').value='0';$('exitPaymentStatus').value='PAID';$('exitAdvanceAmount').value='0';$('exitRemainingAmount').value='0 F';$('exitSaleDate').value=localDateTimeValue(new Date());
+ $('exitPayment').value='Espèces';$('globalDiscountType').value='NONE';$('globalDiscountValue').value='';$('exitCustomerName').value='';$('exitCustomerPhone').value='';$('exitDeliveryLocation').value='';$('exitDeliveryPrice').value='0';$('exitPaymentStatus').value='PAID';$('exitAdvanceAmount').value='0';$('exitRemainingAmount').value='0 F';$('exitSaleDate').value=localDateValue(new Date());
  renderExitStep();renderExitPicker();updateExitSaleOptions();
 }
 function updateExitSaleOptions(){
@@ -979,7 +983,7 @@ function renderExitStep(){
      rows.push(['MONTANT TOTAL',money(grandTotal)],['Paiement',$('exitPayment').value],['Statut',status==='PAID'?'Payé':status==='PARTIAL'?'Paiement partiel':'Non payé']);
      if(paid>0)rows.push(['Avance / payé',money(paid)]);
      rows.push(['Reste à payer',money(remaining)]);
-     rows.push(['Date',new Date($('exitSaleDate').value||Date.now()).toLocaleString('fr-FR')]);
+     rows.push(['Jour de livraison',new Date(($('exitSaleDate').value||localDateValue(new Date()))+'T12:00:00').toLocaleDateString('fr-FR')]);
      if($('exitCustomerName').value.trim())rows.push(['Client',$('exitCustomerName').value.trim()]);
      if($('exitCustomerPhone').value.trim())rows.push(['Téléphone',$('exitCustomerPhone').value.trim()]);
      if($('exitDeliveryLocation').value.trim())rows.push(['Lieu de livraison',$('exitDeliveryLocation').value.trim()]);
@@ -1067,7 +1071,7 @@ $('confirmExit').onclick=()=>{
  }
  btn.dataset.busy='1';btn.disabled=true;
  const draft=cloneData(),now=new Date().toISOString(),reason=$('exitReason').value,note=$('exitNote').value.trim();
- const saleMovementDate=$('exitSaleDate').value?new Date($('exitSaleDate').value).toISOString():now;
+ const saleMovementDate=deliveryDateISO($('exitSaleDate').value);
  const movementIds=[];
  for(const i of exitCart){
    const p=draft.products.find(x=>x.id===i.productId),q=positiveInt(i.qty);
@@ -1083,7 +1087,7 @@ $('confirmExit').onclick=()=>{
    const paymentStatus=$('exitPaymentStatus').value;
    const paidAmount=paymentStatus==='PAID'?totalAmount:paymentStatus==='PARTIAL'?Math.max(0,Math.min(totalAmount,Number($('exitAdvanceAmount').value)||0)):0;
    const remainingAmount=Math.max(0,totalAmount-paidAmount);
-   const chosenDate=$('exitSaleDate').value?new Date($('exitSaleDate').value).toISOString():now;
+   const chosenDate=deliveryDateISO($('exitSaleDate').value);
    draft.accounts.unshift({
      id:uid(),type:'INCOME',
      label:'Vente de '+exitCart.length+' produit'+(exitCart.length>1?'s':''),
