@@ -162,6 +162,7 @@ tr:last-child td{border-bottom:0}
       <button data-page="exit">Sortie / Livraison</button>
       <button data-page="history">Historique</button>
       <button data-page="accounting">Mini comptabilité</button>
+      <button data-page="assistant">Mini IA</button>
       <button data-page="settings">Sauvegarde</button>
     </nav>
     <div class="side-bottom"><small>Les données restent enregistrées sur cet appareil.</small></div>
@@ -193,6 +194,7 @@ tr:last-child td{border-bottom:0}
             <button data-goto="exit"><strong>− Faire une sortie</strong><span>Livraison, vente ou produit retiré</span></button>
             <button data-goto="products"><strong>Voir les produits</strong><span>Consulter les quantités restantes</span></button>
             <button data-goto="accounting"><strong>Mini comptabilité</strong><span>Ventes, dépenses et résultat</span></button>
+            <button data-goto="assistant"><strong>Mini IA</strong><span>Analyse le stock, les ventes et les anomalies</span></button>
           </div>
         </div>
 
@@ -366,7 +368,7 @@ tr:last-child td{border-bottom:0}
           </div>
           <div class="table-wrap" style="margin-top:14px">
             <table>
-              <thead><tr><th>Date</th><th>Produit</th><th>Type</th><th>Quantité</th><th>Stock après</th><th>Détail</th></tr></thead>
+              <thead><tr><th>Date</th><th>Produit</th><th>Type</th><th>Quantité</th><th>Stock après</th><th>Détail</th><th>Action</th></tr></thead>
               <tbody id="historyBody"></tbody>
             </table>
           </div>
@@ -410,6 +412,27 @@ tr:last-child td{border-bottom:0}
               <tbody id="accountingBody"></tbody>
             </table>
           </div>
+        </div>
+      </section>
+
+
+      <!-- ASSISTANT -->
+      <section class="page" id="page-assistant">
+        <h2 class="section-title">Mini IA</h2>
+        <p class="section-sub">Analyse locale des données de stock et de comptabilité présentes sur cet appareil.</p>
+
+        <div class="card" style="margin-top:0">
+          <div class="card-head"><h2>Analyse automatique</h2><button class="btn secondary small" id="refreshAssistant">Actualiser</button></div>
+          <div id="assistantInsights"></div>
+        </div>
+
+        <div class="card">
+          <h2>Poser une question</h2>
+          <div class="field">
+            <input id="assistantQuestion" placeholder="Ex. Quel produit est le plus vendu ?">
+          </div>
+          <button class="btn" id="askAssistant">Analyser</button>
+          <div id="assistantAnswer" class="summary" style="margin-top:14px"></div>
         </div>
       </section>
 
@@ -488,6 +511,7 @@ const pageMeta={
  exit:['Sortie / Livraison','Retirer des unités'],
  history:['Historique','Mouvements du stock'],
  accounting:['Mini comptabilité','Ventes, dépenses et résultat'],
+ assistant:['Mini IA','Analyse intelligente locale'],
  settings:['Sauvegarde','Sauvegarder ou restaurer les données']
 };
 
@@ -595,7 +619,7 @@ document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>gotoPage(b.dat
 document.querySelectorAll('[data-goto]').forEach(b=>b.onclick=()=>gotoPage(b.dataset.goto));
 
 function renderAll(){
- renderDashboard();renderProducts();renderSelects();renderHistory();renderAccounting();
+ renderDashboard();renderProducts();renderSelects();renderHistory();renderAccounting();renderAssistant();
 }
 function renderDashboard(){
  $('dProducts').textContent=data.products.length;
@@ -698,8 +722,65 @@ function renderHistory(){
  const items=data.movements.filter(m=>(!type||m.type===type)&&((m.productName+' '+(m.reason||'')+' '+(m.note||'')).toLowerCase().includes(q)));
  $('historyBody').innerHTML=items.length?items.map(m=>`
  <tr><td>${dt(m.date)}</td><td>${esc(m.productName)}</td><td>${m.type==='IN'?'<span class="badge ok">Entrée</span>':'<span class="badge zero">Sortie</span>'}</td>
- <td><strong>${m.type==='IN'?'+':'−'}${m.qty}</strong></td><td>${m.stockAfter}</td><td>${esc([m.reason,m.note].filter(Boolean).join(' — ')||'—')}</td></tr>`).join('')
- :'<tr><td colspan="6" class="empty">Aucun mouvement.</td></tr>';
+ <td><strong>${m.type==='IN'?'+':'−'}${m.qty}</strong></td><td>${m.stockAfter}</td><td>${esc([m.reason,m.note].filter(Boolean).join(' — ')||'—')}</td>
+ <td><button class="btn danger small" data-delete-movement="${m.id}">Supprimer</button></td></tr>`).join('')
+ :'<tr><td colspan="7" class="empty">Aucun mouvement.</td></tr>';
+ document.querySelectorAll('[data-delete-movement]').forEach(b=>b.onclick=()=>deleteMovement(b.dataset.deleteMovement));
+}
+function recomputeProductSnapshots(draft,productId){
+ const p=draft.products.find(x=>x.id===productId);if(!p)return;
+ let running=Number(p.stock)||0;
+ const moves=draft.movements.filter(m=>m.productId===productId).sort((a,b)=>new Date(b.date)-new Date(a.date));
+ for(const m of moves){
+   m.stockAfter=running;
+   if(m.type==='IN') running-=Number(m.qty)||0;
+   else running+=Number(m.qty)||0;
+ }
+}
+function updateAccountingAfterMovementDelete(draft,movement){
+ for(let aIndex=draft.accounts.length-1;aIndex>=0;aIndex--){
+   const a=draft.accounts[aIndex];
+   if(a.movementId===movement.id){
+     draft.accounts.splice(aIndex,1);
+     continue;
+   }
+   if(Array.isArray(a.movementIds)&&a.movementIds.includes(movement.id)){
+     a.movementIds=a.movementIds.filter(id=>id!==movement.id);
+     if(Array.isArray(a.items)){
+       const idx=a.items.findIndex(i=>i.productId===movement.productId);
+       if(idx>=0)a.items.splice(idx,1);
+     }
+     if(!Array.isArray(a.items)||a.items.length===0){
+       draft.accounts.splice(aIndex,1);
+       continue;
+     }
+     a.baseAmount=a.items.reduce((s,i)=>s+(Number(i.unitPrice)||0)*(Number(i.qty)||0),0);
+     const productDiscount=a.items.reduce((s,i)=>s+(Number(i.discountAmount)||0),0);
+     const afterProducts=Math.max(0,a.baseAmount-productDiscount);
+     const globalDiscount=discountAmount(afterProducts,a.globalDiscountType,a.globalDiscountValue);
+     a.discountAmount=productDiscount+globalDiscount;
+     a.globalDiscountAmount=globalDiscount;
+     a.amount=Math.max(0,afterProducts-globalDiscount);
+     a.label='Vente de '+a.items.length+' produit'+(a.items.length>1?'s':'');
+   }
+ }
+}
+function deleteMovement(id){
+ const m=data.movements.find(x=>x.id===id);if(!m)return;
+ const p=productById(m.productId);if(!p){alert('Produit lié introuvable. Suppression annulée.');return}
+ const qty=positiveInt(m.qty);if(qty===null){alert('Mouvement invalide. Suppression annulée.');return}
+ if(m.type==='IN'&&Number(p.stock)<qty){
+   alert("Impossible de supprimer cette entrée : cela rendrait le stock négatif. Annulez d'abord les sorties dépendantes.");
+   return;
+ }
+ if(!confirm('Supprimer cette ligne ? Le stock et la comptabilité liés seront recalculés automatiquement.'))return;
+ const draft=cloneData();
+ const dp=draft.products.find(x=>x.id===m.productId);
+ if(m.type==='IN')dp.stock-=qty; else dp.stock+=qty;
+ draft.movements=draft.movements.filter(x=>x.id!==id);
+ updateAccountingAfterMovementDelete(draft,m);
+ recomputeProductSnapshots(draft,m.productId);
+ save(draft);
 }
 $('historyType').onchange=renderHistory;$('historySearch').oninput=renderHistory;
 
@@ -997,6 +1078,58 @@ $('exportAccounting').onclick=()=>download(`comptabilite-${dayKey()}.csv`,csv([
  ['Date','Type','Détail','Paiement','Montant','Note'],
  ...(data.accounts||[]).map(a=>[dt(a.date),a.type==='INCOME'?'Vente':'Dépense',a.label,a.payment,a.amount,a.note||''])
 ]),'text/csv;charset=utf-8');
+
+/* MINI IA LOCALE */
+function normalizeText(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()}
+function assistantStats(){
+ const now=Date.now(),days30=30*86400000;
+ const recentOut=data.movements.filter(m=>m.type==='OUT'&&(now-new Date(m.date).getTime())<=days30);
+ const soldByProduct={};
+ recentOut.forEach(m=>soldByProduct[m.productId]=(soldByProduct[m.productId]||0)+(Number(m.qty)||0));
+ const top=Object.entries(soldByProduct).sort((a,b)=>b[1]-a[1])[0];
+ const topProduct=top?productById(top[0]):null;
+ const low=data.products.filter(p=>Number(p.stock)<=Number(p.threshold));
+ const zero=data.products.filter(p=>Number(p.stock)===0);
+ const month=monthKey();
+ const monthSales=(data.accounts||[]).filter(a=>a.type==='INCOME'&&monthKey(new Date(a.date))===month).reduce((s,a)=>s+Number(a.amount||0),0);
+ const monthExpenses=(data.accounts||[]).filter(a=>a.type==='EXPENSE'&&monthKey(new Date(a.date))===month).reduce((s,a)=>s+Number(a.amount||0),0);
+ const highDiscount=(data.accounts||[]).filter(a=>a.type==='INCOME'&&Number(a.baseAmount)>0&&Number(a.discountAmount)/Number(a.baseAmount)>=.3);
+ return {recentOut,soldByProduct,topProduct,topQty:top?top[1]:0,low,zero,monthSales,monthExpenses,highDiscount};
+}
+function renderAssistant(){
+ if(!$('assistantInsights'))return;
+ const s=assistantStats(),items=[];
+ if(s.zero.length)items.push(['Ruptures',s.zero.length+' produit'+(s.zero.length>1?'s':'')+' à 0 : '+s.zero.slice(0,4).map(p=>p.name).join(', ')]);
+ if(s.low.length)items.push(['Stock faible',s.low.length+' produit'+(s.low.length>1?'s':'')+' sous le seuil défini.']);
+ if(s.topProduct)items.push(['Plus sorti sur 30 jours',s.topProduct.name+' : '+s.topQty+' unité'+(s.topQty>1?'s':'')]);
+ if(s.monthExpenses>s.monthSales)items.push(['Attention comptabilité','Les dépenses du mois dépassent actuellement les ventes enregistrées.']);
+ if(s.highDiscount.length)items.push(['Réductions élevées',s.highDiscount.length+' vente'+(s.highDiscount.length>1?'s':'')+' avec au moins 30 % de réduction.']);
+ if(!items.length)items.push(['Analyse','Aucune anomalie importante détectée avec les données disponibles.']);
+ $('assistantInsights').innerHTML=items.map(x=>`<div class="product-card"><div class="meta"><strong>${esc(x[0])}</strong><small>${esc(x[1])}</small></div></div>`).join('');
+}
+function answerAssistant(){
+ const q=normalizeText($('assistantQuestion').value),s=assistantStats();let answer='';
+ if(!q){answer='Écris une question sur le stock, les ventes, les dépenses, les ruptures ou les produits les plus sortis.'}
+ else if(q.includes('plus vendu')||q.includes('plus sortie')||q.includes('meilleur produit')){
+   answer=s.topProduct?`${s.topProduct.name} est le produit le plus sorti sur les 30 derniers jours avec ${s.topQty} unité${s.topQty>1?'s':''}.`:'Il n’y a pas encore assez de sorties enregistrées pour répondre.';
+ }else if(q.includes('rupture')||q.includes('stock 0')){
+   answer=s.zero.length?s.zero.map(p=>p.name+(p.format?' ('+p.format+')':'')).join(', '):'Aucun produit n’est actuellement en rupture.';
+ }else if(q.includes('stock faible')||q.includes('reappro')){
+   answer=s.low.length?s.low.map(p=>p.name+' : '+p.stock).join(' • '):'Aucun produit n’est actuellement sous son seuil d’alerte.';
+ }else if(q.includes('vente')||q.includes('chiffre')){
+   answer='Ventes enregistrées ce mois : '+money(s.monthSales)+'.';
+ }else if(q.includes('depense')){
+   answer='Dépenses enregistrées ce mois : '+money(s.monthExpenses)+'.';
+ }else if(q.includes('resultat')||q.includes('benefice')){
+   answer='Résultat simplifié du mois : '+money(s.monthSales-s.monthExpenses)+'.';
+ }else{
+   answer='Je peux analyser : stock faible, ruptures, produit le plus sorti, ventes, dépenses, résultat et réductions élevées.';
+ }
+ $('assistantAnswer').innerHTML='<strong>'+esc(answer)+'</strong>';
+}
+$('refreshAssistant').onclick=renderAssistant;
+$('askAssistant').onclick=answerAssistant;
+$('assistantQuestion').addEventListener('keydown',e=>{if(e.key==='Enter')answerAssistant()});
 
 /* BACKUP / EXPORT */
 function download(name,content,type){
