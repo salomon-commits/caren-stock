@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Mon Stock</title>
 <link rel="manifest" href="./manifest.webmanifest">
 <meta name="theme-color" content="#111827">
@@ -18,7 +18,7 @@
   --warning:#b54708;--shadow:0 10px 30px rgba(17,24,39,.06);--radius:18px
 }
 *{box-sizing:border-box}
-html{scroll-behavior:smooth}
+html{scroll-behavior:smooth;touch-action:manipulation}
 body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
 button,input,select,textarea{font:inherit}
 button{cursor:pointer}
@@ -64,7 +64,8 @@ button{cursor:pointer}
 .btn.success{background:var(--success)}.btn.danger{background:var(--danger)}
 .btn.small{padding:7px 9px;font-size:12px}
 input,select,textarea{
-  width:100%;border:1px solid var(--line);background:#fff;border-radius:11px;padding:11px 12px;outline:none;color:var(--text)
+  width:100%;border:1px solid var(--line);background:#fff;border-radius:11px;padding:11px 12px;outline:none;color:var(--text);
+  font-size:16px
 }
 input:focus,select:focus,textarea:focus{border-color:#9ca3af;box-shadow:0 0 0 3px rgba(17,24,39,.05)}
 label{display:block;font-size:12px;color:var(--muted);font-weight:700;margin-bottom:6px}
@@ -451,6 +452,20 @@ function load(){
 
  if(!Array.isArray(x.accounts)) x.accounts=[];
 
+ if(x.priceCatalogVersion!==1){
+   const normalize=v=>String(v||'').trim().toLowerCase();
+   BASE_CATALOG.forEach(item=>{
+     const match=x.products.find(p=>normalize(p.name)===normalize(item.name)&&normalize(p.format)===normalize(item.format));
+     if(match){
+       match.category=item.category;
+       match.format=item.format;
+       match.price=item.price;
+     }
+   });
+   x.priceCatalogVersion=1;
+   localStorage.setItem(KEY,JSON.stringify(x));
+ }
+
  if(x.catalogVersion!==1){
    const key=p=>(String(p.name||'').trim().toLowerCase()+'|'+String(p.format||'').trim().toLowerCase());
    const existing=new Set(x.products.map(key));
@@ -711,6 +726,17 @@ $('restoreInput').onchange=async e=>{
 function csv(rows){return '\uFEFF'+rows.map(r=>r.map(v=>{v=String(v??'');return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(';')).join('\n')}
 $('exportStock').onclick=()=>download(`stock-${dayKey()}.csv`,csv([['Produit','Catégorie','Format','Prix','Stock','Seuil'],...data.products.map(p=>[p.name,p.category,p.format||'',p.price||'',p.stock,p.threshold])]),'text/csv;charset=utf-8');
 $('exportHistory').onclick=()=>download(`historique-${dayKey()}.csv`,csv([['Date','Produit','Type','Quantité','Stock après','Motif','Note'],...data.movements.map(m=>[dt(m.date),m.productName,m.type==='IN'?'Entrée':'Sortie',m.qty,m.stockAfter,m.reason,m.note])]),'text/csv;charset=utf-8');
+
+/* BLOQUER LE ZOOM DANS LA PWA */
+['gesturestart','gesturechange','gestureend'].forEach(type=>{
+  document.addEventListener(type,event=>event.preventDefault(),{passive:false});
+});
+let lastTouchEnd=0;
+document.addEventListener('touchend',event=>{
+  const now=Date.now();
+  if(now-lastTouchEnd<=300) event.preventDefault();
+  lastTouchEnd=now;
+},{passive:false});
 
 /* INSTALLATION PWA */
 let deferredInstallPrompt = null;
