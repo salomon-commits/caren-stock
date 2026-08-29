@@ -126,10 +126,7 @@ tr:last-child td{border-bottom:0}
   .cart-discount{grid-template-columns:1fr 1fr}
   .cart-discount .discount-value{grid-column:1/-1}
 }
-.auth-overlay{position:fixed;inset:0;background:rgba(17,24,39,.72);backdrop-filter:blur(8px);z-index:100;display:grid;place-items:center;padding:20px}
-.auth-box{width:min(420px,100%);background:#fff;border-radius:20px;padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.28)}
-.auth-box h2{margin:0 0 6px}.auth-box p{margin:0 0 18px;color:var(--muted);font-size:13px;line-height:1.5}
-.auth-actions{display:flex;gap:8px;flex-wrap:wrap}.sync-status{font-size:11px;font-weight:800;color:var(--muted);white-space:nowrap}
+.sync-status{font-size:11px;font-weight:800;color:var(--muted);white-space:nowrap}
 .hidden{display:none!important}
 @media(max-width:900px){
   .sidebar{display:none}.main{margin-left:0;width:100%}
@@ -157,19 +154,6 @@ tr:last-child td{border-bottom:0}
 </style>
 </head>
 <body>
-<div class="auth-overlay" id="authOverlay">
-  <div class="auth-box">
-    <h2>Connexion Caren Stock</h2>
-    <p>Connectez-vous avec le même compte sur chaque appareil pour retrouver le même stock, les mêmes ventes et le même historique.</p>
-    <div class="field"><label>Email</label><input id="authEmail" type="email" autocomplete="username" placeholder="votre@email.com"></div>
-    <div class="field"><label>Mot de passe</label><input id="authPassword" type="password" autocomplete="current-password" placeholder="Mot de passe"></div>
-    <div class="auth-actions">
-      <button class="btn" id="authLogin">Se connecter</button>
-      <button class="btn secondary" id="authOffline">Utiliser hors ligne</button>
-    </div>
-    <div class="notice hidden" id="authMessage" style="margin-top:12px"></div>
-  </div>
-</div>
 <div class="app">
   <aside class="sidebar">
     <div class="logo"><strong>Mon Stock</strong><span>Gestion simple du stock</span></div>
@@ -183,7 +167,7 @@ tr:last-child td{border-bottom:0}
       <button data-page="assistant">Mini IA</button>
       <button data-page="settings">Sauvegarde</button>
     </nav>
-    <div class="side-bottom"><small>Les données restent enregistrées sur cet appareil.</small></div>
+    <div class="side-bottom"><small>Les données sont synchronisées avec le cloud et restent disponibles hors ligne.</small></div>
   </aside>
 
   <div class="main">
@@ -191,7 +175,6 @@ tr:last-child td{border-bottom:0}
       <div><h1 id="pageTitle">Accueil</h1><p id="pageSubtitle">Vue générale du stock</p></div>
       <div style="display:flex;gap:8px;align-items:center">
         <span class="sync-status" id="syncStatus">Local</span>
-        <button class="btn secondary small" id="cloudLogout" hidden>Déconnexion</button>
         <button class="btn small" id="installAppBtn" hidden>Installer</button>
         <button class="btn secondary small" id="quickBackup">Sauvegarder</button>
       </div>
@@ -633,10 +616,6 @@ function save(next=data){
 }
 
 function setSyncStatus(text){if($('syncStatus'))$('syncStatus').textContent=text}
-function showAuthMessage(text){
- const el=$('authMessage');if(!el)return;
- el.textContent=text;el.classList.toggle('hidden',!text);
-}
 function dbDate(iso){
  const d=new Date(iso||Date.now());
  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -853,34 +832,23 @@ async function pullCloudData(allowMigration=true){
  }
 }
 async function activateCloud(){
- $('authOverlay').classList.add('hidden');
- $('cloudLogout').hidden=false;
  cloudReady=true;
  await pullCloudData(true);
  clearInterval(cloudRefreshTimer);
  cloudRefreshTimer=setInterval(()=>{if(cloudReady&&!cloudDirty&&!cloudSyncing&&document.visibilityState==='visible')pullCloudData(false)},30000);
 }
 async function initCloud(){
- if(!window.supabase){showAuthMessage("Le module de synchronisation n'a pas pu charger. Vous pouvez utiliser l'application hors ligne.");return}
- sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
- const {data:{session}}=await sb.auth.getSession();
- if(session)await activateCloud();
- else{$('authOverlay').classList.remove('hidden');setSyncStatus('Connexion requise')}
- sb.auth.onAuthStateChange(async(event,session)=>{
-   if(event==='SIGNED_IN'&&session&&!cloudReady)await activateCloud();
-   if(event==='SIGNED_OUT'){cloudReady=false;cloudBaseline=null;$('cloudLogout').hidden=true;$('authOverlay').classList.remove('hidden');setSyncStatus('Local')}
+ if(!window.supabase){
+   setSyncStatus('Hors ligne');
+   console.error("Le module Supabase n'a pas pu charger.");
+   return;
+ }
+ sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
+   auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}
  });
+ setSyncStatus('Connexion cloud…');
+ await activateCloud();
 }
-$('authLogin').onclick=async()=>{
- const email=$('authEmail').value.trim(),password=$('authPassword').value;
- if(!email||!password){showAuthMessage('Entrez votre email et votre mot de passe.');return}
- $('authLogin').disabled=true;showAuthMessage('Connexion…');
- const {error}=await sb.auth.signInWithPassword({email,password});
- $('authLogin').disabled=false;
- if(error)showAuthMessage('Connexion impossible : '+error.message);else showAuthMessage('');
-};
-$('authOffline').onclick=()=>{$('authOverlay').classList.add('hidden');setSyncStatus('Hors ligne')};
-$('cloudLogout').onclick=async()=>{if(sb)await sb.auth.signOut()};
 window.addEventListener('online',()=>{if(cloudReady){setSyncStatus('Reconnexion…');if(cloudDirty)scheduleCloudSync();else pullCloudData(false)}});
 window.addEventListener('offline',()=>{if(cloudReady)setSyncStatus('Hors ligne')});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&cloudReady&&!cloudDirty&&!cloudSyncing)pullCloudData(false)});
