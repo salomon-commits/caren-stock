@@ -407,10 +407,11 @@ tr:last-child td{border-bottom:0}
         <p class="section-sub">Les ventes sont enregistrées automatiquement depuis les sorties.</p>
 
         <div class="grid4">
-          <div class="stat"><small>Ventes aujourd'hui</small><b id="aToday">0 F</b></div>
-          <div class="stat"><small>Chiffre d'affaires du mois</small><b id="aMonthSales">0 F</b></div>
+          <div class="stat"><small>Recette produits aujourd'hui</small><b id="aToday">0 F</b></div>
+          <div class="stat"><small>Recette produits du mois</small><b id="aMonthSales">0 F</b></div>
+          <div class="stat"><small>Livraisons à reverser</small><b id="aMonthDelivery">0 F</b></div>
           <div class="stat"><small>Dépenses du mois</small><b id="aMonthExpenses">0 F</b></div>
-          <div class="stat"><small>Résultat du mois</small><b id="aMonthProfit">0 F</b></div>
+          <div class="stat"><small>Résultat produits du mois</small><b id="aMonthProfit">0 F</b></div>
         </div>
 
         <div class="card">
@@ -782,7 +783,7 @@ async function fetchCloudState(){
  for(const i of (ir.data||[])){if(!saleItemsBySale.has(i.sale_id))saleItemsBySale.set(i.sale_id,[]);saleItemsBySale.get(i.sale_id).push(i)}
  const sales=(sr.data||[]).map(s=>{
    const items=(saleItemsBySale.get(s.id)||[]).map(i=>({productId:i.product_id,name:i.product_name,format:i.product_format||'',qty:Number(i.quantity)||0,unitPrice:Number(i.unit_price)||0,discountType:i.discount_type||'NONE',discountValue:Number(i.discount_value)||0,discountAmount:Number(i.discount_amount)||0,total:Number(i.line_total)||0}));
-   return {id:s.id,type:'INCOME',label:'Vente de '+items.length+' produit'+(items.length>1?'s':''),amount:Number(s.total_amount)||0,payment:s.payment_method||'',note:s.note||'',date:deliveryDateISO(s.delivery_date),movementIds:(saleItemsBySale.get(s.id)||[]).map(i=>i.movement_id).filter(Boolean),customerName:s.customer_name||'',customerPhone:s.customer_phone||'',deliveryLocation:s.delivery_location||'',deliveryPrice:Number(s.delivery_price)||0,paymentStatus:s.payment_status||'PAID',paidAmount:Number(s.paid_amount)||0,remainingAmount:Number(s.remaining_amount)||0,baseAmount:Number(s.products_subtotal)||0,discountAmount:Number(s.discount_amount)||0,items};
+   return {id:s.id,type:'INCOME',label:'Vente de '+items.length+' produit'+(items.length>1?'s':''),amount:Number(s.total_amount)||0,productAmount:Math.max(0,(Number(s.products_subtotal)||0)-(Number(s.discount_amount)||0)),payment:s.payment_method||'',note:s.note||'',date:deliveryDateISO(s.delivery_date),movementIds:(saleItemsBySale.get(s.id)||[]).map(i=>i.movement_id).filter(Boolean),customerName:s.customer_name||'',customerPhone:s.customer_phone||'',deliveryLocation:s.delivery_location||'',deliveryPrice:Number(s.delivery_price)||0,paymentStatus:s.payment_status||'PAID',paidAmount:Number(s.paid_amount)||0,remainingAmount:Number(s.remaining_amount)||0,baseAmount:Number(s.products_subtotal)||0,discountAmount:Number(s.discount_amount)||0,items};
  });
  const expenses=(er.data||[]).map(e=>({id:e.id,type:'EXPENSE',label:e.label,amount:Number(e.amount)||0,payment:e.payment_method||'',note:e.note||'',date:e.expense_date}));
  const accounts=[...sales,...expenses].sort((a,b)=>new Date(b.date)-new Date(a.date));
@@ -1347,7 +1348,7 @@ $('confirmExit').onclick=()=>{
    draft.accounts.unshift({
      id:uid(),type:'INCOME',
      label:'Vente de '+exitCart.length+' produit'+(exitCart.length>1?'s':''),
-     amount:totalAmount,payment:$('exitPayment').value,note,date:chosenDate,movementIds,
+     amount:totalAmount,productAmount:t.total,payment:$('exitPayment').value,note,date:chosenDate,movementIds,
      customerName:$('exitCustomerName').value.trim(),customerPhone:$('exitCustomerPhone').value.trim(),
      deliveryLocation:$('exitDeliveryLocation').value.trim(),deliveryPrice,
      paymentStatus,paidAmount,remainingAmount,
@@ -1414,16 +1415,25 @@ function printReceipt(a){
 }
 
 /* MINI COMPTABILITÉ */
+function saleProductAmount(a){
+ if(!a||a.type!=='INCOME')return 0;
+ if(Number.isFinite(Number(a.productAmount)))return Math.max(0,Number(a.productAmount));
+ const total=Number(a.amount)||0,delivery=Number(a.deliveryPrice)||0;
+ return Math.max(0,total-delivery);
+}
 function renderAccounting(){
  const q=String($('accountingSearch')?.value||'').trim().toLowerCase();
  const allAccounts=Array.isArray(data.accounts)?data.accounts:[];
  const accounts=allAccounts.filter(a=>!q||((a.label||'')+' '+(a.note||'')+' '+(a.payment||'')+' '+(a.customerName||'')+' '+(a.customerPhone||'')+' '+(a.deliveryLocation||'')+' '+(a.paymentStatus||'')).toLowerCase().includes(q));
  const today=dayKey(),month=monthKey();
- const todaySales=allAccounts.filter(a=>a.type==='INCOME'&&dayKey(new Date(a.date))===today).reduce((s,a)=>s+Number(a.amount||0),0);
- const monthSales=allAccounts.filter(a=>a.type==='INCOME'&&monthKey(new Date(a.date))===month).reduce((s,a)=>s+Number(a.amount||0),0);
+ const todaySales=allAccounts.filter(a=>a.type==='INCOME'&&dayKey(new Date(a.date))===today).reduce((s,a)=>s+saleProductAmount(a),0);
+ const monthIncome=allAccounts.filter(a=>a.type==='INCOME'&&monthKey(new Date(a.date))===month);
+ const monthSales=monthIncome.reduce((s,a)=>s+saleProductAmount(a),0);
+ const monthDelivery=monthIncome.reduce((s,a)=>s+(Number(a.deliveryPrice)||0),0);
  const monthExpenses=allAccounts.filter(a=>a.type==='EXPENSE'&&monthKey(new Date(a.date))===month).reduce((s,a)=>s+Number(a.amount||0),0);
  $('aToday').textContent=money(todaySales);
  $('aMonthSales').textContent=money(monthSales);
+ $('aMonthDelivery').textContent=money(monthDelivery);
  $('aMonthExpenses').textContent=money(monthExpenses);
  $('aMonthProfit').textContent=money(monthSales-monthExpenses);
  $('accountingBody').innerHTML=accounts.length?accounts.slice(0,100).map(a=>`
@@ -1432,7 +1442,7 @@ function renderAccounting(){
      <td>${a.type==='INCOME'?'<span class="badge ok">Vente</span>':'<span class="badge zero">Dépense</span>'}</td>
      <td><strong>${esc(a.label||'—')}</strong>${a.customerName?'<br><small style="color:var(--muted)">Client : '+esc(a.customerName)+'</small>':''}${a.deliveryLocation?'<br><small style="color:var(--muted)">Livraison : '+esc(a.deliveryLocation)+'</small>':''}${a.paymentStatus?'<br><small style="color:var(--muted)">Statut : '+esc(a.paymentStatus==='PAID'?'Payé':a.paymentStatus==='PARTIAL'?'Partiel':'Non payé')+(Number(a.remainingAmount)>0?' • Reste '+money(a.remainingAmount):'')+'</small>':''}${a.note?'<br><small style="color:var(--muted)">'+esc(a.note)+'</small>':''}</td>
      <td>${esc(a.payment||'—')}</td>
-     <td class="${a.type==='INCOME'?'positive':'negative'}"><strong>${a.type==='INCOME'?'+':'−'}${money(a.amount)}</strong></td>
+     <td class="${a.type==='INCOME'?'positive':'negative'}"><strong>${a.type==='INCOME'?'+':'−'}${money(a.type==='INCOME'?saleProductAmount(a):a.amount)}</strong>${a.type==='INCOME'&&Number(a.deliveryPrice)>0?'<br><small style="color:var(--muted)">Livraison : '+money(a.deliveryPrice)+' • Total client : '+money(a.amount)+'</small>':''}</td>
      <td>${a.type==='INCOME'?'<button class="btn secondary small" data-receipt="'+a.id+'">Imprimer</button>':'—'}</td>
    </tr>`).join(''):'<tr><td colspan="6" class="empty">Aucune opération comptable.</td></tr>';
  document.querySelectorAll('[data-receipt]').forEach(b=>b.onclick=()=>{const a=(data.accounts||[]).find(x=>x.id===b.dataset.receipt);if(a)printReceipt(a)});
@@ -1453,8 +1463,8 @@ $('addExpenseBtn').onclick=()=>{
 };
 
 $('exportAccounting').onclick=()=>download(`comptabilite-${dayKey()}.csv`,csv([
- ['Date','Type','Client','Téléphone','Lieu livraison','Paiement','Statut','Montant total','Payé/Avance','Reste à payer','Livraison','Détail','Note'],
- ...(data.accounts||[]).map(a=>[dt(a.date),a.type==='INCOME'?'Vente':'Dépense',a.customerName||'',a.customerPhone||'',a.deliveryLocation||'',a.payment||'',a.paymentStatus||'',a.amount||0,a.paidAmount==null?a.amount:a.paidAmount,a.remainingAmount||0,a.deliveryPrice||0,a.label,a.note||''])
+ ['Date','Type','Client','Téléphone','Lieu livraison','Paiement','Statut','Recette produits','Livraison','Montant total client','Payé/Avance','Reste à payer','Détail','Note'],
+ ...(data.accounts||[]).map(a=>[dt(a.date),a.type==='INCOME'?'Vente':'Dépense',a.customerName||'',a.customerPhone||'',a.deliveryLocation||'',a.payment||'',a.paymentStatus||'',a.type==='INCOME'?saleProductAmount(a):'',a.deliveryPrice||0,a.amount||0,a.paidAmount==null?a.amount:a.paidAmount,a.remainingAmount||0,a.label,a.note||''])
 ]),'text/csv;charset=utf-8');
 
 /* MINI IA LOCALE */
@@ -1469,7 +1479,7 @@ function assistantStats(){
  const low=data.products.filter(p=>Number(p.stock)<=Number(p.threshold));
  const zero=data.products.filter(p=>Number(p.stock)===0);
  const month=monthKey();
- const monthSales=(data.accounts||[]).filter(a=>a.type==='INCOME'&&monthKey(new Date(a.date))===month).reduce((s,a)=>s+Number(a.amount||0),0);
+ const monthSales=(data.accounts||[]).filter(a=>a.type==='INCOME'&&monthKey(new Date(a.date))===month).reduce((s,a)=>s+saleProductAmount(a),0);
  const monthExpenses=(data.accounts||[]).filter(a=>a.type==='EXPENSE'&&monthKey(new Date(a.date))===month).reduce((s,a)=>s+Number(a.amount||0),0);
  const highDiscount=(data.accounts||[]).filter(a=>a.type==='INCOME'&&Number(a.baseAmount)>0&&Number(a.discountAmount)/Number(a.baseAmount)>=.3);
  return {recentOut,soldByProduct,topProduct,topQty:top?top[1]:0,low,zero,monthSales,monthExpenses,highDiscount};
@@ -1495,7 +1505,7 @@ function answerAssistant(){
  }else if(q.includes('stock faible')||q.includes('reappro')){
    answer=s.low.length?s.low.map(p=>p.name+' : '+p.stock).join(' • '):'Aucun produit n’est actuellement sous son seuil d’alerte.';
  }else if(q.includes('vente')||q.includes('chiffre')){
-   answer='Ventes enregistrées ce mois : '+money(s.monthSales)+'.';
+   answer='Recette produits enregistrée ce mois : '+money(s.monthSales)+'. Les frais de livraison sont suivis séparément.';
  }else if(q.includes('depense')){
    answer='Dépenses enregistrées ce mois : '+money(s.monthExpenses)+'.';
  }else if(q.includes('resultat')||q.includes('benefice')){
