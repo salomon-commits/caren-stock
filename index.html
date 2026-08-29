@@ -104,14 +104,18 @@ tr:last-child td{border-bottom:0}
 @media(max-width:900px){
   .sidebar{display:none}.main{margin-left:0;width:100%}
   .topbar{height:64px;padding:0 16px}
-  .content{padding:18px 14px 92px}
+  .content{padding:18px 14px 122px}
   .grid4{grid-template-columns:1fr 1fr}
   .quick{grid-template-columns:1fr}
   .mobile-nav{
     display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;background:#fff;
-    border-top:1px solid var(--line);z-index:30;padding:7px 6px calc(7px + env(safe-area-inset-bottom))
+    border-top:1px solid var(--line);z-index:30;padding:10px 8px calc(10px + env(safe-area-inset-bottom));
+    min-height:78px;box-shadow:0 -8px 24px rgba(17,24,39,.08)
   }
-  .mobile-nav button{border:0;background:transparent;color:#6b7280;padding:8px 3px;border-radius:9px;font-size:10px;font-weight:800}
+  .mobile-nav button{
+    border:0;background:transparent;color:#6b7280;padding:14px 6px;border-radius:12px;
+    font-size:13px;font-weight:800;min-height:52px
+  }
   .mobile-nav button.active{background:#111827;color:#fff}
 }
 @media(max-width:560px){
