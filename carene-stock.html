@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mon Stock</title>
+<style>
+:root{
+  --bg:#f5f7fb;--surface:#ffffff;--surface2:#f9fafb;--text:#111827;--muted:#6b7280;
+  --line:#e5e7eb;--primary:#111827;--primary2:#374151;--success:#047857;--danger:#b42318;
+  --warning:#b54708;--shadow:0 10px 30px rgba(17,24,39,.06);--radius:18px
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+button,input,select,textarea{font:inherit}
+button{cursor:pointer}
+.app{min-height:100vh;display:flex}
+.sidebar{
+  width:250px;background:#111827;color:#fff;padding:22px 16px;position:fixed;inset:0 auto 0 0;
+  display:flex;flex-direction:column;z-index:20
+}
+.logo{padding:6px 10px 24px}
+.logo strong{font-size:21px;display:block}
+.logo span{font-size:12px;color:#9ca3af}
+.nav{display:grid;gap:7px}
+.nav button{
+  border:0;background:transparent;color:#cbd5e1;text-align:left;padding:12px 13px;border-radius:12px;font-weight:700
+}
+.nav button:hover,.nav button.active{background:#fff;color:#111827}
+.side-bottom{margin-top:auto;border-top:1px solid #293241;padding-top:14px}
+.side-bottom small{color:#9ca3af;line-height:1.4}
+.main{margin-left:250px;width:calc(100% - 250px)}
+.topbar{
+  height:72px;background:rgba(255,255,255,.94);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;padding:0 28px;position:sticky;top:0;z-index:15
+}
+.topbar h1{margin:0;font-size:20px}
+.topbar p{margin:3px 0 0;color:var(--muted);font-size:12px}
+.content{max-width:1180px;margin:auto;padding:26px 28px 90px}
+.page{display:none}.page.active{display:block}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.stat,.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.stat{padding:18px}.stat small{color:var(--muted);font-weight:700}.stat b{display:block;font-size:28px;margin-top:8px}
+.card{padding:20px;margin-top:18px}
+.card h2{font-size:16px;margin:0 0 14px}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.card-head h2{margin:0}
+.quick{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.quick button{
+  min-height:112px;border:1px solid var(--line);background:#fff;border-radius:16px;padding:16px;text-align:left
+}
+.quick button:hover{transform:translateY(-1px);box-shadow:var(--shadow)}
+.quick strong{display:block;font-size:15px;margin-bottom:5px}.quick span{font-size:12px;color:var(--muted)}
+.btn{border:0;background:var(--primary);color:#fff;border-radius:11px;padding:10px 14px;font-weight:800}
+.btn.secondary{background:#fff;color:var(--text);border:1px solid var(--line)}
+.btn.success{background:var(--success)}.btn.danger{background:var(--danger)}
+.btn.small{padding:7px 9px;font-size:12px}
+input,select,textarea{
+  width:100%;border:1px solid var(--line);background:#fff;border-radius:11px;padding:11px 12px;outline:none;color:var(--text)
+}
+input:focus,select:focus,textarea:focus{border-color:#9ca3af;box-shadow:0 0 0 3px rgba(17,24,39,.05)}
+label{display:block;font-size:12px;color:var(--muted);font-weight:700;margin-bottom:6px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field{margin-bottom:13px}
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px}
+table{width:100%;border-collapse:collapse;min-width:760px}
+th,td{padding:12px 13px;border-bottom:1px solid var(--line);text-align:left;font-size:13px}
+th{background:#fafafa;color:#6b7280;font-size:12px}
+tr:last-child td{border-bottom:0}
+.badge{display:inline-flex;padding:5px 8px;border-radius:999px;font-size:11px;font-weight:800}
+.badge.ok{background:#ecfdf3;color:#047857}.badge.low{background:#fff7ed;color:#b54708}.badge.zero{background:#fef3f2;color:#b42318}
+.toolbar{display:flex;gap:9px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.toolbar .search{max-width:320px}
+.empty{padding:32px;text-align:center;color:var(--muted)}
+.wizard{max-width:720px;margin:0 auto}
+.steps{display:flex;align-items:center;margin:8px 0 22px}
+.step{display:flex;align-items:center;gap:8px;color:#9ca3af;font-size:12px;font-weight:800;flex:1}
+.step::after{content:"";height:2px;background:#e5e7eb;flex:1;margin-left:8px}
+.step:last-child::after{display:none}
+.step .dot{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:#e5e7eb;color:#6b7280}
+.step.active,.step.done{color:#111827}
+.step.active .dot{background:#111827;color:#fff}.step.done .dot{background:#d1fae5;color:#047857}
+.wizard-panel{display:none}.wizard-panel.active{display:block}
+.wizard-actions{display:flex;justify-content:space-between;gap:10px;margin-top:18px}
+.summary{
+  background:#f9fafb;border:1px solid var(--line);border-radius:14px;padding:15px;margin-top:14px
+}
+.summary-row{display:flex;justify-content:space-between;gap:14px;padding:8px 0;border-bottom:1px dashed #d1d5db;font-size:13px}
+.summary-row:last-child{border:0}.summary-row span{color:var(--muted)}
+.product-card{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);
+  border-radius:14px;padding:13px;margin-bottom:10px
+}
+.product-card .meta{min-width:0}.product-card strong{display:block}.product-card small{color:var(--muted)}
+.product-stock{text-align:right}.product-stock b{font-size:20px;display:block}
+.notice{padding:12px 14px;border-radius:12px;background:#f9fafb;border:1px solid var(--line);font-size:12px;color:var(--muted);line-height:1.5}
+.notice.success{background:#ecfdf3;border-color:#a7f3d0;color:#065f46}
+.notice.warning{background:#fff7ed;border-color:#fed7aa;color:#9a3412}
+.mobile-nav{display:none}
+.section-title{margin-bottom:6px}.section-sub{margin:0 0 20px;color:var(--muted);font-size:13px}
+.actions{display:flex;gap:6px;flex-wrap:wrap}
+.hidden{display:none!important}
+@media(max-width:900px){
+  .sidebar{display:none}.main{margin-left:0;width:100%}
+  .topbar{height:64px;padding:0 16px}
+  .content{padding:18px 14px 92px}
+  .grid4{grid-template-columns:1fr 1fr}
+  .quick{grid-template-columns:1fr}
+  .mobile-nav{
+    display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;background:#fff;
+    border-top:1px solid var(--line);z-index:30;padding:7px 6px calc(7px + env(safe-area-inset-bottom))
+  }
+  .mobile-nav button{border:0;background:transparent;color:#6b7280;padding:8px 3px;border-radius:9px;font-size:10px;font-weight:800}
+  .mobile-nav button.active{background:#111827;color:#fff}
+}
+@media(max-width:560px){
+  .grid4{grid-template-columns:1fr 1fr}.stat b{font-size:23px}
+  .form-row{grid-template-columns:1fr}.card{padding:15px}.steps{overflow:hidden}
+  .step{font-size:10px}.step .dot{width:24px;height:24px}.step::after{margin-left:4px}
+  .topbar p{display:none}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="logo"><strong>Mon Stock</strong><span>Gestion simple du stock</span></div>
+    <nav class="nav">
+      <button data-page="dashboard" class="active">Accueil</button>
+      <button data-page="products">Produits</button>
+      <button data-page="entry">Entrée de stock</button>
+      <button data-page="exit">Sortie / Livraison</button>
+      <button data-page="history">Historique</button>
+      <button data-page="settings">Sauvegarde</button>
+    </nav>
+    <div class="side-bottom"><small>Les données restent enregistrées sur cet appareil.</small></div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div><h1 id="pageTitle">Accueil</h1><p id="pageSubtitle">Vue générale du stock</p></div>
+      <button class="btn secondary small" id="quickBackup">Sauvegarder</button>
+    </header>
+
+    <main class="content">
+      <!-- DASHBOARD -->
+      <section class="page active" id="page-dashboard">
+        <div class="grid4">
+          <div class="stat"><small>Produits</small><b id="dProducts">0</b></div>
+          <div class="stat"><small>Unités en stock</small><b id="dUnits">0</b></div>
+          <div class="stat"><small>Stock faible</small><b id="dLow">0</b></div>
+          <div class="stat"><small>Sorties aujourd'hui</small><b id="dOutToday">0</b></div>
+        </div>
+
+        <div class="card">
+          <h2>Que voulez-vous faire ?</h2>
+          <div class="quick">
+            <button data-goto="entry"><strong>+ Ajouter du stock</strong><span>Réapprovisionnement ou retour</span></button>
+            <button data-goto="exit"><strong>− Faire une sortie</strong><span>Livraison, vente ou produit retiré</span></button>
+            <button data-goto="products"><strong>Voir les produits</strong><span>Consulter les quantités restantes</span></button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>Produits à surveiller</h2><button class="btn secondary small" data-goto="products">Voir tout</button></div>
+          <div id="lowStockList"></div>
+        </div>
+      </section>
+
+      <!-- PRODUCTS -->
+      <section class="page" id="page-products">
+        <h2 class="section-title">Produits</h2>
+        <p class="section-sub">Ajoutez vos produits et consultez le stock disponible.</p>
+
+        <div class="card" style="margin-top:0">
+          <div class="toolbar">
+            <input id="productSearch" class="search" placeholder="Rechercher un produit...">
+            <button class="btn" id="startAddProduct">+ Nouveau produit</button>
+          </div>
+          <div class="table-wrap" style="margin-top:14px">
+            <table>
+              <thead><tr><th>Produit</th><th>Catégorie</th><th>Stock</th><th>État</th><th>Actions</th></tr></thead>
+              <tbody id="productsBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card hidden" id="addProductCard">
+          <div class="card-head"><h2>Ajouter un produit</h2><button class="btn secondary small" id="cancelAddProduct">Fermer</button></div>
+          <div class="wizard" id="productWizard">
+            <div class="steps">
+              <div class="step active" data-step="1"><span class="dot">1</span>Produit</div>
+              <div class="step" data-step="2"><span class="dot">2</span>Stock</div>
+              <div class="step" data-step="3"><span class="dot">3</span>Confirmer</div>
+            </div>
+
+            <div class="wizard-panel active" data-panel="1">
+              <div class="field"><label>Nom du produit</label><input id="newName" placeholder="Ex. Savon Carène"></div>
+              <div class="field"><label>Catégorie</label><input id="newCategory" placeholder="Ex. Savon, crème, gel..."></div>
+              <div class="wizard-actions"><span></span><button class="btn" data-pnext>Continuer</button></div>
+            </div>
+
+            <div class="wizard-panel" data-panel="2">
+              <div class="form-row">
+                <div class="field"><label>Stock de départ</label><input id="newStock" type="number" min="0" step="1" value="0"></div>
+                <div class="field"><label>Alerte stock faible</label><input id="newThreshold" type="number" min="0" step="1" value="5"></div>
+              </div>
+              <div class="notice">Exemple : si l'alerte est réglée à 5, le produit sera signalé dès qu'il reste 5 unités ou moins.</div>
+              <div class="wizard-actions"><button class="btn secondary" data-pprev>Retour</button><button class="btn" data-pnext>Continuer</button></div>
+            </div>
+
+            <div class="wizard-panel" data-panel="3">
+              <div class="summary" id="newProductSummary"></div>
+              <div class="wizard-actions"><button class="btn secondary" data-pprev>Retour</button><button class="btn success" id="confirmAddProduct">Ajouter le produit</button></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ENTRY -->
+      <section class="page" id="page-entry">
+        <h2 class="section-title">Entrée de stock</h2>
+        <p class="section-sub">Ajoutez des unités à un produit existant.</p>
+        <div class="card wizard" style="margin-top:0">
+          <div class="steps" id="entrySteps">
+            <div class="step active" data-step="1"><span class="dot">1</span>Produit</div>
+            <div class="step" data-step="2"><span class="dot">2</span>Quantité</div>
+            <div class="step" data-step="3"><span class="dot">3</span>Confirmer</div>
+          </div>
+          <div class="wizard-panel active" data-entry-panel="1">
+            <div class="field"><label>Choisir le produit</label><select id="entryProduct"></select></div>
+            <div id="entryProductInfo"></div>
+            <div class="wizard-actions"><span></span><button class="btn" data-enext>Continuer</button></div>
+          </div>
+          <div class="wizard-panel" data-entry-panel="2">
+            <div class="field"><label>Quantité à ajouter</label><input id="entryQty" type="number" min="1" step="1" placeholder="Ex. 20"></div>
+            <div class="field"><label>Motif</label>
+              <select id="entryReason"><option>Réapprovisionnement</option><option>Retour client</option><option>Correction</option><option>Autre</option></select>
+            </div>
+            <div class="field"><label>Note (facultatif)</label><textarea id="entryNote" rows="3" placeholder="Ex. Arrivage fournisseur"></textarea></div>
+            <div class="wizard-actions"><button class="btn secondary" data-eprev>Retour</button><button class="btn" data-enext>Continuer</button></div>
+          </div>
+          <div class="wizard-panel" data-entry-panel="3">
+            <div class="summary" id="entrySummary"></div>
+            <div class="wizard-actions"><button class="btn secondary" data-eprev>Retour</button><button class="btn success" id="confirmEntry">Valider l'entrée</button></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- EXIT -->
+      <section class="page" id="page-exit">
+        <h2 class="section-title">Sortie / Livraison</h2>
+        <p class="section-sub">Retirez les produits qui quittent le stock.</p>
+        <div class="card wizard" style="margin-top:0">
+          <div class="steps" id="exitSteps">
+            <div class="step active" data-step="1"><span class="dot">1</span>Produit</div>
+            <div class="step" data-step="2"><span class="dot">2</span>Sortie</div>
+            <div class="step" data-step="3"><span class="dot">3</span>Confirmer</div>
+          </div>
+          <div class="wizard-panel active" data-exit-panel="1">
+            <div class="field"><label>Choisir le produit</label><select id="exitProduct"></select></div>
+            <div id="exitProductInfo"></div>
+            <div class="wizard-actions"><span></span><button class="btn" data-xnext>Continuer</button></div>
+          </div>
+          <div class="wizard-panel" data-exit-panel="2">
+            <div class="field"><label>Quantité à sortir</label><input id="exitQty" type="number" min="1" step="1" placeholder="Ex. 5"></div>
+            <div class="field"><label>Motif</label>
+              <select id="exitReason"><option>Livraison / commande</option><option>Vente directe</option><option>Produit abîmé</option><option>Perte</option><option>Correction</option><option>Autre</option></select>
+            </div>
+            <div class="field"><label>Note (facultatif)</label><textarea id="exitNote" rows="3" placeholder="Ex. Livraison cliente Awa"></textarea></div>
+            <div class="wizard-actions"><button class="btn secondary" data-xprev>Retour</button><button class="btn" data-xnext>Continuer</button></div>
+          </div>
+          <div class="wizard-panel" data-exit-panel="3">
+            <div class="summary" id="exitSummary"></div>
+            <div class="wizard-actions"><button class="btn secondary" data-xprev>Retour</button><button class="btn" id="confirmExit">Valider la sortie</button></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- HISTORY -->
+      <section class="page" id="page-history">
+        <h2 class="section-title">Historique</h2>
+        <p class="section-sub">Toutes les entrées et sorties enregistrées.</p>
+        <div class="card" style="margin-top:0">
+          <div class="toolbar">
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <select id="historyType" style="width:auto"><option value="">Tous</option><option value="IN">Entrées</option><option value="OUT">Sorties</option></select>
+              <input id="historySearch" class="search" placeholder="Rechercher...">
+            </div>
+            <button class="btn secondary" id="exportHistory">Exporter CSV</button>
+          </div>
+          <div class="table-wrap" style="margin-top:14px">
+            <table>
+              <thead><tr><th>Date</th><th>Produit</th><th>Type</th><th>Quantité</th><th>Stock après</th><th>Détail</th></tr></thead>
+              <tbody id="historyBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section class="page" id="page-settings">
+        <h2 class="section-title">Sauvegarde</h2>
+        <p class="section-sub">Gardez une copie de vos données.</p>
+        <div class="card" style="margin-top:0">
+          <h2>Sauvegarder les données</h2>
+          <p class="section-sub">Téléchargez une copie complète de votre stock et de l'historique.</p>
+          <button class="btn" id="backupBtn">Télécharger la sauvegarde</button>
+        </div>
+        <div class="card">
+          <h2>Restaurer une sauvegarde</h2>
+          <p class="section-sub">Choisissez un fichier de sauvegarde créé par cette application.</p>
+          <label class="btn secondary" style="display:inline-block;margin:0">Choisir un fichier
+            <input type="file" id="restoreInput" accept=".json,application/json" hidden>
+          </label>
+        </div>
+        <div class="card">
+          <h2>Exporter le stock</h2>
+          <p class="section-sub">Créez un fichier CSV lisible dans Excel.</p>
+          <button class="btn secondary" id="exportStock">Exporter le stock CSV</button>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<nav class="mobile-nav">
+  <button data-page="dashboard" class="active">Accueil</button>
+  <button data-page="products">Produits</button>
+  <button data-page="entry">Entrée</button>
+  <button data-page="exit">Sortie</button>
+  <button data-page="history">Historique</button>
+</nav>
+
+<script>
+(() => {
+const KEY='mon_stock_app_v2';
+const $=id=>document.getElementById(id);
+let data=load();
+let productStep=1, entryStep=1, exitStep=1;
+
+const pageMeta={
+ dashboard:['Accueil','Vue générale du stock'],
+ products:['Produits','Liste et gestion des produits'],
+ entry:['Entrée de stock','Ajouter des unités'],
+ exit:['Sortie / Livraison','Retirer des unités'],
+ history:['Historique','Mouvements du stock'],
+ settings:['Sauvegarde','Sauvegarder ou restaurer les données']
+};
+
+function load(){
+ try{
+   const x=JSON.parse(localStorage.getItem(KEY));
+   if(x&&Array.isArray(x.products)&&Array.isArray(x.movements)) return x;
+ }catch(e){}
+ return {products:[],movements:[]};
+}
+function save(){localStorage.setItem(KEY,JSON.stringify(data));renderAll()}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
+function esc(s=''){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
+function dt(iso){return new Intl.DateTimeFormat('fr-FR',{dateStyle:'short',timeStyle:'short'}).format(new Date(iso))}
+function dayKey(d=new Date()){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function productById(id){return data.products.find(p=>p.id===id)}
+
+function gotoPage(page){
+ document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+ $('page-'+page).classList.add('active');
+ document.querySelectorAll('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));
+ $('pageTitle').textContent=pageMeta[page][0];$('pageSubtitle').textContent=pageMeta[page][1];
+ if(page==='entry') resetEntry();
+ if(page==='exit') resetExit();
+ window.scrollTo({top:0,behavior:'smooth'});
+}
+document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>gotoPage(b.dataset.page));
+document.querySelectorAll('[data-goto]').forEach(b=>b.onclick=()=>gotoPage(b.dataset.goto));
+
+function renderAll(){
+ renderDashboard();renderProducts();renderSelects();renderHistory();
+}
+function renderDashboard(){
+ $('dProducts').textContent=data.products.length;
+ $('dUnits').textContent=data.products.reduce((a,p)=>a+p.stock,0);
+ $('dLow').textContent=data.products.filter(p=>p.stock<=p.threshold).length;
+ $('dOutToday').textContent=data.movements.filter(m=>m.type==='OUT'&&dayKey(new Date(m.date))===dayKey()).reduce((a,m)=>a+m.qty,0);
+ const low=data.products.filter(p=>p.stock<=p.threshold).slice(0,5);
+ $('lowStockList').innerHTML=low.length?low.map(p=>`
+ <div class="product-card">
+   <div class="meta"><strong>${esc(p.name)}</strong><small>${esc(p.category||'Sans catégorie')}</small></div>
+   <div class="product-stock"><b>${p.stock}</b><span class="badge ${p.stock===0?'zero':'low'}">${p.stock===0?'Rupture':'Faible'}</span></div>
+ </div>`).join(''):'<div class="notice success">Aucun produit en stock faible.</div>';
+}
+function renderProducts(){
+ const q=$('productSearch').value.trim().toLowerCase();
+ const items=data.products.filter(p=>(p.name+' '+(p.category||'')).toLowerCase().includes(q));
+ $('productsBody').innerHTML=items.length?items.map(p=>{
+   const badge=p.stock===0?'<span class="badge zero">Rupture</span>':p.stock<=p.threshold?'<span class="badge low">Faible</span>':'<span class="badge ok">OK</span>';
+   return `<tr><td><strong>${esc(p.name)}</strong></td><td>${esc(p.category||'—')}</td><td><strong>${p.stock}</strong></td><td>${badge}</td>
+   <td><div class="actions"><button class="btn secondary small" data-edit="${p.id}">Modifier</button><button class="btn danger small" data-del="${p.id}">Supprimer</button></div></td></tr>`
+ }).join(''):'<tr><td colspan="5" class="empty">Aucun produit.</td></tr>';
+ document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{
+   const p=productById(b.dataset.del); if(!p)return;
+   if(confirm(`Supprimer "${p.name}" ?`)){data.products=data.products.filter(x=>x.id!==p.id);save()}
+ });
+ document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>{
+   const p=productById(b.dataset.edit);if(!p)return;
+   const name=prompt('Nom du produit :',p.name);if(name===null)return;
+   const cat=prompt('Catégorie :',p.category||'');if(cat===null)return;
+   const th=prompt('Alerte stock faible :',p.threshold);if(th===null)return;
+   p.name=name.trim()||p.name;p.category=cat.trim();p.threshold=Math.max(0,Number(th)||0);save();
+ });
+}
+$('productSearch').oninput=renderProducts;
+
+function renderSelects(){
+ const opts=data.products.length?'<option value="">— Choisir —</option>'+data.products.map(p=>`<option value="${p.id}">${esc(p.name)} — stock ${p.stock}</option>`).join(''):'<option value="">Aucun produit</option>';
+ $('entryProduct').innerHTML=opts;$('exitProduct').innerHTML=opts;
+ updateEntryProductInfo();updateExitProductInfo();
+}
+function renderHistory(){
+ const type=$('historyType').value;
+ const q=$('historySearch').value.trim().toLowerCase();
+ const items=data.movements.filter(m=>(!type||m.type===type)&&((m.productName+' '+(m.reason||'')+' '+(m.note||'')).toLowerCase().includes(q)));
+ $('historyBody').innerHTML=items.length?items.map(m=>`
+ <tr><td>${dt(m.date)}</td><td>${esc(m.productName)}</td><td>${m.type==='IN'?'<span class="badge ok">Entrée</span>':'<span class="badge zero">Sortie</span>'}</td>
+ <td><strong>${m.type==='IN'?'+':'−'}${m.qty}</strong></td><td>${m.stockAfter}</td><td>${esc([m.reason,m.note].filter(Boolean).join(' — ')||'—')}</td></tr>`).join('')
+ :'<tr><td colspan="6" class="empty">Aucun mouvement.</td></tr>';
+}
+$('historyType').onchange=renderHistory;$('historySearch').oninput=renderHistory;
+
+/* PRODUCT WIZARD */
+$('startAddProduct').onclick=()=>{$('addProductCard').classList.remove('hidden');productStep=1;renderProductStep();$('addProductCard').scrollIntoView({behavior:'smooth'})}
+$('cancelAddProduct').onclick=()=>{$('addProductCard').classList.add('hidden')}
+function renderProductStep(){
+ document.querySelectorAll('#productWizard .wizard-panel').forEach(p=>p.classList.toggle('active',Number(p.dataset.panel)===productStep));
+ document.querySelectorAll('#productWizard .step').forEach(s=>{
+   const n=Number(s.dataset.step);s.classList.toggle('active',n===productStep);s.classList.toggle('done',n<productStep)
+ });
+ if(productStep===3){
+   $('newProductSummary').innerHTML=[
+    ['Produit',$('newName').value.trim()||'—'],
+    ['Catégorie',$('newCategory').value.trim()||'—'],
+    ['Stock de départ',$('newStock').value||'0'],
+    ['Alerte stock faible',$('newThreshold').value||'0']
+   ].map(x=>`<div class="summary-row"><span>${x[0]}</span><strong>${esc(x[1])}</strong></div>`).join('');
+ }
+}
+document.querySelectorAll('[data-pnext]').forEach(b=>b.onclick=()=>{
+ if(productStep===1&&!$('newName').value.trim()){alert('Entrez le nom du produit.');return}
+ productStep=Math.min(3,productStep+1);renderProductStep()
+});
+document.querySelectorAll('[data-pprev]').forEach(b=>b.onclick=()=>{productStep=Math.max(1,productStep-1);renderProductStep()});
+$('confirmAddProduct').onclick=()=>{
+ const name=$('newName').value.trim(),category=$('newCategory').value.trim(),stock=Math.max(0,Number($('newStock').value)||0),threshold=Math.max(0,Number($('newThreshold').value)||0);
+ if(data.products.some(p=>p.name.toLowerCase()===name.toLowerCase())){alert('Ce produit existe déjà.');return}
+ const p={id:uid(),name,category,stock,threshold,createdAt:new Date().toISOString()};data.products.unshift(p);
+ if(stock>0)data.movements.unshift({id:uid(),productId:p.id,productName:p.name,type:'IN',qty:stock,stockAfter:stock,reason:'Stock initial',note:'',date:new Date().toISOString()});
+ save();$('newName').value='';$('newCategory').value='';$('newStock').value=0;$('newThreshold').value=5;$('addProductCard').classList.add('hidden');gotoPage('products')
+};
+
+/* ENTRY WIZARD */
+function resetEntry(){entryStep=1;$('entryProduct').value='';$('entryQty').value='';$('entryNote').value='';renderEntryStep();updateEntryProductInfo()}
+function renderEntryStep(){
+ document.querySelectorAll('[data-entry-panel]').forEach(p=>p.classList.toggle('active',Number(p.dataset.entryPanel)===entryStep));
+ document.querySelectorAll('#entrySteps .step').forEach(s=>{const n=Number(s.dataset.step);s.classList.toggle('active',n===entryStep);s.classList.toggle('done',n<entryStep)});
+ if(entryStep===3){
+  const p=productById($('entryProduct').value),q=Number($('entryQty').value)||0;
+  $('entrySummary').innerHTML=summaryRows([['Produit',p?.name||'—'],['Stock actuel',String(p?.stock??'—')],['Quantité ajoutée','+'+q],['Nouveau stock',String((p?.stock||0)+q)],['Motif',$('entryReason').value]]);
+ }
+}
+function updateEntryProductInfo(){
+ const p=productById($('entryProduct').value);
+ $('entryProductInfo').innerHTML=p?`<div class="notice">Stock actuel : <strong>${p.stock}</strong> unités</div>`:'';
+}
+$('entryProduct').onchange=updateEntryProductInfo;
+document.querySelectorAll('[data-enext]').forEach(b=>b.onclick=()=>{
+ if(entryStep===1&&!productById($('entryProduct').value)){alert('Choisissez un produit.');return}
+ if(entryStep===2&&Number($('entryQty').value)<=0){alert('Entrez une quantité valide.');return}
+ entryStep=Math.min(3,entryStep+1);renderEntryStep()
+});
+document.querySelectorAll('[data-eprev]').forEach(b=>b.onclick=()=>{entryStep=Math.max(1,entryStep-1);renderEntryStep()});
+$('confirmEntry').onclick=()=>{
+ const p=productById($('entryProduct').value),q=Number($('entryQty').value);if(!p||q<=0)return;
+ p.stock+=q;data.movements.unshift({id:uid(),productId:p.id,productName:p.name,type:'IN',qty:q,stockAfter:p.stock,reason:$('entryReason').value,note:$('entryNote').value.trim(),date:new Date().toISOString()});
+ save();alert('Entrée enregistrée.');gotoPage('dashboard')
+};
+
+/* EXIT WIZARD */
+function resetExit(){exitStep=1;$('exitProduct').value='';$('exitQty').value='';$('exitNote').value='';renderExitStep();updateExitProductInfo()}
+function renderExitStep(){
+ document.querySelectorAll('[data-exit-panel]').forEach(p=>p.classList.toggle('active',Number(p.dataset.exitPanel)===exitStep));
+ document.querySelectorAll('#exitSteps .step').forEach(s=>{const n=Number(s.dataset.step);s.classList.toggle('active',n===exitStep);s.classList.toggle('done',n<exitStep)});
+ if(exitStep===3){
+  const p=productById($('exitProduct').value),q=Number($('exitQty').value)||0;
+  $('exitSummary').innerHTML=summaryRows([['Produit',p?.name||'—'],['Stock actuel',String(p?.stock??'—')],['Quantité retirée','−'+q],['Stock restant',String((p?.stock||0)-q)],['Motif',$('exitReason').value]]);
+ }
+}
+function updateExitProductInfo(){
+ const p=productById($('exitProduct').value);
+ $('exitProductInfo').innerHTML=p?`<div class="notice ${p.stock===0?'warning':''}">Stock disponible : <strong>${p.stock}</strong> unités</div>`:'';
+}
+$('exitProduct').onchange=updateExitProductInfo;
+document.querySelectorAll('[data-xnext]').forEach(b=>b.onclick=()=>{
+ const p=productById($('exitProduct').value),q=Number($('exitQty').value)||0;
+ if(exitStep===1&&!p){alert('Choisissez un produit.');return}
+ if(exitStep===2&&(q<=0)){alert('Entrez une quantité valide.');return}
+ if(exitStep===2&&p&&q>p.stock){alert(`Stock insuffisant. Il reste ${p.stock} unités.`);return}
+ exitStep=Math.min(3,exitStep+1);renderExitStep()
+});
+document.querySelectorAll('[data-xprev]').forEach(b=>b.onclick=()=>{exitStep=Math.max(1,exitStep-1);renderExitStep()});
+$('confirmExit').onclick=()=>{
+ const p=productById($('exitProduct').value),q=Number($('exitQty').value);if(!p||q<=0||q>p.stock)return;
+ p.stock-=q;data.movements.unshift({id:uid(),productId:p.id,productName:p.name,type:'OUT',qty:q,stockAfter:p.stock,reason:$('exitReason').value,note:$('exitNote').value.trim(),date:new Date().toISOString()});
+ save();alert('Sortie enregistrée.');gotoPage('dashboard')
+};
+
+function summaryRows(rows){return rows.map(x=>`<div class="summary-row"><span>${esc(x[0])}</span><strong>${esc(x[1])}</strong></div>`).join('')}
+
+/* BACKUP / EXPORT */
+function download(name,content,type){
+ const blob=new Blob([content],{type});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),500)
+}
+function backup(){download(`sauvegarde-stock-${dayKey()}.json`,JSON.stringify(data,null,2),'application/json')}
+$('backupBtn').onclick=backup;$('quickBackup').onclick=backup;
+$('restoreInput').onchange=async e=>{
+ const f=e.target.files[0];if(!f)return;
+ try{
+  const x=JSON.parse(await f.text());if(!Array.isArray(x.products)||!Array.isArray(x.movements))throw 0;
+  if(confirm('Restaurer cette sauvegarde ?')){data=x;save();gotoPage('dashboard')}
+ }catch(err){alert('Fichier invalide.')}
+ e.target.value='';
+}
+function csv(rows){return '\uFEFF'+rows.map(r=>r.map(v=>{v=String(v??'');return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(';')).join('\n')}
+$('exportStock').onclick=()=>download(`stock-${dayKey()}.csv`,csv([['Produit','Catégorie','Stock','Seuil'],...data.products.map(p=>[p.name,p.category,p.stock,p.threshold])]),'text/csv;charset=utf-8');
+$('exportHistory').onclick=()=>download(`historique-${dayKey()}.csv`,csv([['Date','Produit','Type','Quantité','Stock après','Motif','Note'],...data.movements.map(m=>[dt(m.date),m.productName,m.type==='IN'?'Entrée':'Sortie',m.qty,m.stockAfter,m.reason,m.note])]),'text/csv;charset=utf-8');
+
+renderAll();
+})();
+</script>
+</body>
+</html>
