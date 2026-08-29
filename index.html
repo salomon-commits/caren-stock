@@ -335,14 +335,32 @@ tr:last-child td{border-bottom:0}
                 <div class="field"><label>Valeur</label><input id="globalDiscountValue" type="number" min="0" step="1" placeholder="Ex. 10"></div>
               </div>
               <div class="form-row">
-                <div class="field"><label>Nom du client (facultatif)</label><input id="exitCustomerName" placeholder="Ex. Mme Koné"></div>
+                <div class="field"><label>Nom du client (facultatif mais recommandé)</label><input id="exitCustomerName" placeholder="Ex. Mme Koné"></div>
                 <div class="field"><label>Téléphone (facultatif)</label><input id="exitCustomerPhone" inputmode="tel" placeholder="Ex. 07 00 00 00 00"></div>
               </div>
               <div class="form-row">
+                <div class="field"><label>Lieu de livraison</label><input id="exitDeliveryLocation" placeholder="Ex. Cocody, Angré 8e tranche"></div>
+                <div class="field"><label>Prix de la livraison</label><input id="exitDeliveryPrice" type="number" min="0" step="1" value="0" placeholder="Ex. 2000"></div>
+              </div>
+              <div class="form-row">
+                <div class="field"><label>Date de la vente / livraison</label><input id="exitSaleDate" type="datetime-local"></div>
                 <div class="field"><label>Paiement</label>
                   <select id="exitPayment"><option>Espèces</option><option>Mobile Money</option><option>Virement</option><option>Carte</option><option>Crédit</option></select>
                 </div>
-                <div class="field"><label>Total final</label><input id="exitSaleAmount" disabled></div>
+              </div>
+              <div class="form-row">
+                <div class="field"><label>Statut du paiement</label>
+                  <select id="exitPaymentStatus">
+                    <option value="PAID">Payé</option>
+                    <option value="PARTIAL">Paiement partiel / avance</option>
+                    <option value="UNPAID">Non payé</option>
+                  </select>
+                </div>
+                <div class="field" id="advanceField"><label>Avance payée</label><input id="exitAdvanceAmount" type="number" min="0" step="1" value="0" placeholder="Ex. 10000"></div>
+              </div>
+              <div class="form-row">
+                <div class="field"><label>Montant total</label><input id="exitSaleAmount" disabled></div>
+                <div class="field"><label>Reste à payer</label><input id="exitRemainingAmount" disabled></div>
               </div>
               <div class="notice">Chaque produit peut avoir sa propre réduction. Une réduction globale peut ensuite s'appliquer sur le total restant.</div>
             </div>
@@ -588,6 +606,10 @@ function dayKey(d=new Date()){return d.getFullYear()+'-'+String(d.getMonth()+1).
 function productById(id){return data.products.find(p=>p.id===id)}
 function money(v){return (Number(v)||0).toLocaleString('fr-FR')+' F'}
 function monthKey(d=new Date()){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')}
+function localDateTimeValue(d){
+ const p=n=>String(n).padStart(2,'0');
+ return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes());
+}
 function isSaleReason(){return ['Livraison / commande','Vente directe'].includes($('exitReason').value)}
 function discountAmount(base,type,value){
  const v=Math.max(0,Number(value)||0);
@@ -911,13 +933,26 @@ $('confirmEntry').onclick=()=>{
 /* EXIT WIZARD */
 function resetExit(){
  exitStep=1;exitCart=[];$('exitSearch').value='';$('exitNote').value='';$('exitReason').value='Livraison / commande';
- $('exitPayment').value='Espèces';$('globalDiscountType').value='NONE';$('globalDiscountValue').value='';$('exitCustomerName').value='';$('exitCustomerPhone').value='';
+ $('exitPayment').value='Espèces';$('globalDiscountType').value='NONE';$('globalDiscountValue').value='';$('exitCustomerName').value='';$('exitCustomerPhone').value='';$('exitDeliveryLocation').value='';$('exitDeliveryPrice').value='0';$('exitPaymentStatus').value='PAID';$('exitAdvanceAmount').value='0';$('exitRemainingAmount').value='0 F';$('exitSaleDate').value=localDateTimeValue(new Date());
  renderExitStep();renderExitPicker();updateExitSaleOptions();
 }
 function updateExitSaleOptions(){
  const sale=isSaleReason();
  $('exitSaleOptions').classList.toggle('hidden',!sale);
- if(sale){const t=exitTotals();$('exitSaleAmount').value=money(t.total)}
+ if(!sale)return;
+ const t=exitTotals();
+ const delivery=Math.max(0,Number($('exitDeliveryPrice').value)||0);
+ const grandTotal=t.total+delivery;
+ const status=$('exitPaymentStatus').value;
+ let advance=0;
+ if(status==='PAID')advance=grandTotal;
+ else if(status==='PARTIAL')advance=Math.max(0,Math.min(grandTotal,Number($('exitAdvanceAmount').value)||0));
+ const remaining=Math.max(0,grandTotal-advance);
+ $('exitSaleAmount').value=money(grandTotal);
+ $('exitRemainingAmount').value=money(remaining);
+ $('advanceField').classList.toggle('hidden',status!=='PARTIAL');
+ if(status==='PAID')$('exitAdvanceAmount').value=grandTotal;
+ if(status==='UNPAID')$('exitAdvanceAmount').value=0;
 }
 function renderExitStep(){
  document.querySelectorAll('[data-exit-panel]').forEach(p=>p.classList.toggle('active',Number(p.dataset.exitPanel)===exitStep));
@@ -934,9 +969,20 @@ function renderExitStep(){
      rows.push(['Sous-total',money(t.subtotal)]);
      if(t.productDiscount)rows.push(['Réductions produits','− '+money(t.productDiscount)]);
      if(t.globalDiscount)rows.push(['Réduction globale','− '+money(t.globalDiscount)]);
-     rows.push(['TOTAL',money(t.total)],['Paiement',$('exitPayment').value]);
+     const delivery=Math.max(0,Number($('exitDeliveryPrice').value)||0);
+     const grandTotal=t.total+delivery;
+     const status=$('exitPaymentStatus').value;
+     const paid=status==='PAID'?grandTotal:status==='PARTIAL'?Math.max(0,Math.min(grandTotal,Number($('exitAdvanceAmount').value)||0)):0;
+     const remaining=Math.max(0,grandTotal-paid);
+     rows.push(['Produits',money(t.total)]);
+     if(delivery)rows.push(['Livraison',money(delivery)]);
+     rows.push(['MONTANT TOTAL',money(grandTotal)],['Paiement',$('exitPayment').value],['Statut',status==='PAID'?'Payé':status==='PARTIAL'?'Paiement partiel':'Non payé']);
+     if(paid>0)rows.push(['Avance / payé',money(paid)]);
+     rows.push(['Reste à payer',money(remaining)]);
+     rows.push(['Date',new Date($('exitSaleDate').value||Date.now()).toLocaleString('fr-FR')]);
      if($('exitCustomerName').value.trim())rows.push(['Client',$('exitCustomerName').value.trim()]);
      if($('exitCustomerPhone').value.trim())rows.push(['Téléphone',$('exitCustomerPhone').value.trim()]);
+     if($('exitDeliveryLocation').value.trim())rows.push(['Lieu de livraison',$('exitDeliveryLocation').value.trim()]);
    }
    rows.push(['Motif',$('exitReason').value]);
    $('exitSummary').innerHTML=summaryRows(rows);
@@ -996,6 +1042,9 @@ $('exitSearch').oninput=renderExitPicker;
 $('exitReason').onchange=updateExitSaleOptions;
 $('globalDiscountType').onchange=updateExitSaleOptions;
 $('globalDiscountValue').oninput=updateExitSaleOptions;
+$('exitDeliveryPrice').oninput=updateExitSaleOptions;
+$('exitPaymentStatus').onchange=updateExitSaleOptions;
+$('exitAdvanceAmount').oninput=updateExitSaleOptions;
 document.querySelectorAll('[data-xnext]').forEach(b=>b.onclick=()=>{
  if(exitStep===1&&exitCart.length===0){alert('Sélectionnez au moins un produit.');return}
  if(exitStep===2){
@@ -1018,21 +1067,30 @@ $('confirmExit').onclick=()=>{
  }
  btn.dataset.busy='1';btn.disabled=true;
  const draft=cloneData(),now=new Date().toISOString(),reason=$('exitReason').value,note=$('exitNote').value.trim();
+ const saleMovementDate=$('exitSaleDate').value?new Date($('exitSaleDate').value).toISOString():now;
  const movementIds=[];
  for(const i of exitCart){
    const p=draft.products.find(x=>x.id===i.productId),q=positiveInt(i.qty);
    if(!p||q===null||q>Number(p.stock)){btn.dataset.busy='';btn.disabled=false;alert('Le stock a changé. Vérifiez les quantités.');return}
    p.stock-=q;
    const movementId=uid();movementIds.push(movementId);
-   draft.movements.unshift({id:movementId,productId:p.id,productName:p.name,type:'OUT',qty:q,stockAfter:p.stock,reason,note,date:now});
+   draft.movements.unshift({id:movementId,productId:p.id,productName:p.name,type:'OUT',qty:q,stockAfter:p.stock,reason,note,date:saleMovementDate});
  }
  if(isSaleReason()){
    const t=exitTotals();
+   const deliveryPrice=Math.max(0,Number($('exitDeliveryPrice').value)||0);
+   const totalAmount=t.total+deliveryPrice;
+   const paymentStatus=$('exitPaymentStatus').value;
+   const paidAmount=paymentStatus==='PAID'?totalAmount:paymentStatus==='PARTIAL'?Math.max(0,Math.min(totalAmount,Number($('exitAdvanceAmount').value)||0)):0;
+   const remainingAmount=Math.max(0,totalAmount-paidAmount);
+   const chosenDate=$('exitSaleDate').value?new Date($('exitSaleDate').value).toISOString():now;
    draft.accounts.unshift({
      id:uid(),type:'INCOME',
      label:'Vente de '+exitCart.length+' produit'+(exitCart.length>1?'s':''),
-     amount:t.total,payment:$('exitPayment').value,note,date:now,movementIds,
+     amount:totalAmount,payment:$('exitPayment').value,note,date:chosenDate,movementIds,
      customerName:$('exitCustomerName').value.trim(),customerPhone:$('exitCustomerPhone').value.trim(),
+     deliveryLocation:$('exitDeliveryLocation').value.trim(),deliveryPrice,
+     paymentStatus,paidAmount,remainingAmount,
      baseAmount:t.subtotal,discountAmount:t.productDiscount+t.globalDiscount,
      items:exitCart.map(i=>{const p=productById(i.productId),t2=cartItemTotal(i);return {productId:i.productId,name:p?.name,format:p?.format,qty:positiveInt(i.qty),unitPrice:p?.price,discountType:i.discountType,discountValue:Number(i.discountValue)||0,discountAmount:t2.discount,total:t2.total}}),
      globalDiscountType:$('globalDiscountType').value,globalDiscountValue:Number($('globalDiscountValue').value)||0,globalDiscountAmount:t.globalDiscount
@@ -1075,11 +1133,17 @@ function printReceipt(a){
  '<div><strong>N° :</strong> '+receiptNumber(a)+'</div><div><strong>Date :</strong> '+dt(a.date)+'</div>'+
  (a.customerName?'<div><strong>Client :</strong> '+esc(a.customerName)+'</div>':'')+
  (a.customerPhone?'<div><strong>Téléphone :</strong> '+esc(a.customerPhone)+'</div>':'')+
- '<div><strong>Paiement :</strong> '+esc(a.payment||'—')+'</div><div class="line"></div>'+
+ '<div><strong>Paiement :</strong> '+esc(a.payment||'—')+'</div>'+
+ (a.deliveryLocation?'<div><strong>Lieu de livraison :</strong> '+esc(a.deliveryLocation)+'</div>':'')+
+ '<div><strong>Statut :</strong> '+esc(a.paymentStatus==='PAID'?'Payé':a.paymentStatus==='PARTIAL'?'Paiement partiel':a.paymentStatus==='UNPAID'?'Non payé':'Payé')+'</div>'+
+ '<div class="line"></div>'+
  '<table><thead><tr><th>Produit</th><th style="text-align:center">Qté</th><th style="text-align:right">PU</th><th style="text-align:right">Total</th></tr></thead><tbody>'+itemRows+'</tbody></table>'+
- '<div class="row"><span>Sous-total</span><strong>'+money(Number(a.baseAmount)||Number(a.amount)||0)+'</strong></div>'+
+ '<div class="row"><span>Sous-total produits</span><strong>'+money(Number(a.baseAmount)||Number(a.amount)||0)+'</strong></div>'+
  (discount?'<div class="row"><span>Réduction</span><strong>− '+money(discount)+'</strong></div>':'')+
- '<div class="row total"><span>TOTAL PAYÉ</span><span>'+money(a.amount)+'</span></div>'+
+ (Number(a.deliveryPrice)?'<div class="row"><span>Livraison</span><strong>'+money(a.deliveryPrice)+'</strong></div>':'')+
+ '<div class="row total"><span>MONTANT TOTAL</span><span>'+money(a.amount)+'</span></div>'+
+ '<div class="row"><span>Montant payé / avance</span><strong>'+money(a.paidAmount==null?a.amount:a.paidAmount)+'</strong></div>'+
+ '<div class="row"><span>Reste à payer</span><strong>'+money(a.remainingAmount||0)+'</strong></div>'+
  (a.note?'<div class="line"></div><div><strong>Note :</strong> '+esc(a.note)+'</div>':'')+
  '<div class="line"></div><div class="center muted">Merci pour votre achat.</div>'+
  '<div class="no-print"><button class="btn" onclick="window.print()">Imprimer / Enregistrer PDF</button></div>'+
@@ -1093,7 +1157,7 @@ function printReceipt(a){
 function renderAccounting(){
  const q=String($('accountingSearch')?.value||'').trim().toLowerCase();
  const allAccounts=Array.isArray(data.accounts)?data.accounts:[];
- const accounts=allAccounts.filter(a=>!q||((a.label||'')+' '+(a.note||'')+' '+(a.payment||'')).toLowerCase().includes(q));
+ const accounts=allAccounts.filter(a=>!q||((a.label||'')+' '+(a.note||'')+' '+(a.payment||'')+' '+(a.customerName||'')+' '+(a.customerPhone||'')+' '+(a.deliveryLocation||'')+' '+(a.paymentStatus||'')).toLowerCase().includes(q));
  const today=dayKey(),month=monthKey();
  const todaySales=allAccounts.filter(a=>a.type==='INCOME'&&dayKey(new Date(a.date))===today).reduce((s,a)=>s+Number(a.amount||0),0);
  const monthSales=allAccounts.filter(a=>a.type==='INCOME'&&monthKey(new Date(a.date))===month).reduce((s,a)=>s+Number(a.amount||0),0);
@@ -1106,7 +1170,7 @@ function renderAccounting(){
    <tr>
      <td>${dt(a.date)}</td>
      <td>${a.type==='INCOME'?'<span class="badge ok">Vente</span>':'<span class="badge zero">Dépense</span>'}</td>
-     <td><strong>${esc(a.label||'—')}</strong>${a.note?'<br><small style="color:var(--muted)">'+esc(a.note)+'</small>':''}</td>
+     <td><strong>${esc(a.label||'—')}</strong>${a.customerName?'<br><small style="color:var(--muted)">Client : '+esc(a.customerName)+'</small>':''}${a.deliveryLocation?'<br><small style="color:var(--muted)">Livraison : '+esc(a.deliveryLocation)+'</small>':''}${a.paymentStatus?'<br><small style="color:var(--muted)">Statut : '+esc(a.paymentStatus==='PAID'?'Payé':a.paymentStatus==='PARTIAL'?'Partiel':'Non payé')+(Number(a.remainingAmount)>0?' • Reste '+money(a.remainingAmount):'')+'</small>':''}${a.note?'<br><small style="color:var(--muted)">'+esc(a.note)+'</small>':''}</td>
      <td>${esc(a.payment||'—')}</td>
      <td class="${a.type==='INCOME'?'positive':'negative'}"><strong>${a.type==='INCOME'?'+':'−'}${money(a.amount)}</strong></td>
      <td>${a.type==='INCOME'?'<button class="btn secondary small" data-receipt="'+a.id+'">Imprimer</button>':'—'}</td>
@@ -1129,8 +1193,8 @@ $('addExpenseBtn').onclick=()=>{
 };
 
 $('exportAccounting').onclick=()=>download(`comptabilite-${dayKey()}.csv`,csv([
- ['Date','Type','Détail','Paiement','Montant','Note'],
- ...(data.accounts||[]).map(a=>[dt(a.date),a.type==='INCOME'?'Vente':'Dépense',a.label,a.payment,a.amount,a.note||''])
+ ['Date','Type','Client','Téléphone','Lieu livraison','Paiement','Statut','Montant total','Payé/Avance','Reste à payer','Livraison','Détail','Note'],
+ ...(data.accounts||[]).map(a=>[dt(a.date),a.type==='INCOME'?'Vente':'Dépense',a.customerName||'',a.customerPhone||'',a.deliveryLocation||'',a.payment||'',a.paymentStatus||'',a.amount||0,a.paidAmount==null?a.amount:a.paidAmount,a.remainingAmount||0,a.deliveryPrice||0,a.label,a.note||''])
 ]),'text/csv;charset=utf-8');
 
 /* MINI IA LOCALE */
