@@ -231,7 +231,7 @@
 
   /* CAREN_MOBILE_UX_V3 */
   const mobileUxStyle=document.createElement('style');
-  mobileUxStyle.textContent=\`
+  mobileUxStyle.textContent=`
     .btn:disabled{opacity:.42;cursor:not-allowed;box-shadow:none!important;transform:none!important}
     @media(max-width:560px){
       .topbar{height:74px;padding:0 12px;gap:8px;position:sticky}
@@ -279,7 +279,7 @@
       #page-history .toolbar,#page-accounting .toolbar,#page-products .toolbar{align-items:stretch}
       #page-history .toolbar>div,#page-history .toolbar .search,#page-accounting .toolbar .search,#page-products .toolbar .search{width:100%;max-width:none}
     }
-  \`;
+  `;
   document.head.appendChild(mobileUxStyle);
 
   const dashboardGrid=$('page-dashboard')?.querySelector('.grid4');
