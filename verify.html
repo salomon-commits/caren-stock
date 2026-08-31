@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Vérification reçu CARÈNE</title>
+<meta name="theme-color" content="#111827">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:20px;background:#f5f7fb;color:#111827;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}.box{width:min(460px,100%);background:#fff;border:1px solid #e5e7eb;border-radius:22px;padding:24px;box-shadow:0 18px 55px rgba(17,24,39,.10)}h1{font-size:22px;margin:0 0 6px}.brand{font-size:13px;font-weight:900;letter-spacing:3px;color:#6b7280;margin-bottom:18px}.status{border-radius:14px;padding:14px;margin:16px 0;font-size:13px;line-height:1.5}.wait{background:#f9fafb;border:1px solid #e5e7eb;color:#6b7280}.ok{background:#ecfdf3;border:1px solid #a7f3d0;color:#065f46}.bad{background:#fef3f2;border:1px solid #fecaca;color:#991b1b}.rows{border:1px solid #e5e7eb;border-radius:14px;padding:4px 14px}.row{display:flex;justify-content:space-between;gap:16px;padding:11px 0;border-bottom:1px dashed #d1d5db;font-size:13px}.row:last-child{border-bottom:0}.row span{color:#6b7280}.row strong{text-align:right}.btn{display:inline-block;margin-top:18px;border:0;background:#111827;color:#fff;padding:11px 15px;border-radius:11px;font-weight:800;text-decoration:none;font-size:13px}.seal{font-size:44px;line-height:1;margin-bottom:8px}.small{font-size:11px;color:#6b7280;margin-top:14px;line-height:1.5}
+</style>
+</head>
+<body>
+<main class="box">
+  <div class="brand">CARÈNE</div>
+  <div id="result"><div class="status wait">Vérification du reçu en cours…</div></div>
+  <a class="btn" href="./">Ouvrir Carène Stock</a>
+</main>
+<script>
+const SUPABASE_URL='https://eowojgsidztzxbdyvrfp.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY='sb_publishable_AU0Tl0jy7Ua9-vpxuZ-EsQ_aPNxbhCT';
+const money=v=>(Number(v)||0).toLocaleString('fr-FR')+' F';
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+const receiptNumber=a=>{const d=new Date((a.delivery_date||'')+'T12:00:00');return 'REC-'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'-'+String(a.id||'').slice(-6).toUpperCase()};
+(async()=>{
+ const id=new URLSearchParams(location.search).get('receipt');
+ const result=document.getElementById('result');
+ if(!id){result.innerHTML='<div class="seal">!</div><h1>Code manquant</h1><div class="status bad">Aucun numéro de reçu n’a été transmis.</div>';return}
+ if(!window.supabase){result.innerHTML='<div class="seal">!</div><h1>Vérification indisponible</h1><div class="status bad">Impossible de joindre le service de vérification.</div>';return}
+ try{
+   const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
+   const {data:a,error}=await sb.from('sales').select('id,customer_name,customer_phone,delivery_date,delivery_location,delivery_price,payment_method,payment_status,total_amount,paid_amount,remaining_amount,created_at').eq('id',id).maybeSingle();
+   if(error)throw error;
+   if(!a){result.innerHTML='<div class="seal">✕</div><h1>Reçu introuvable</h1><div class="status bad">Ce code ne correspond à aucune vente actuellement enregistrée dans CARÈNE.</div><div class="small">Un reçu imprimé ou une capture d’écran ne suffit pas : le code doit exister dans la base CARÈNE.</div>';return}
+   const status=a.payment_status==='PAID'?'Payé':a.payment_status==='PARTIAL'?'Paiement partiel':'Non payé';
+   const date=new Date(a.delivery_date+'T12:00:00').toLocaleDateString('fr-FR');
+   result.innerHTML='<div class="seal">✓</div><h1>Reçu CARÈNE vérifié</h1><div class="status ok">Ce reçu correspond à une vente enregistrée dans la base CARÈNE.</div><div class="rows">'+
+    '<div class="row"><span>N°</span><strong>'+esc(receiptNumber(a))+'</strong></div>'+ 
+    '<div class="row"><span>Date</span><strong>'+esc(date)+'</strong></div>'+ 
+    '<div class="row"><span>Client</span><strong>'+esc(a.customer_name||'—')+'</strong></div>'+ 
+    '<div class="row"><span>Lieu</span><strong>'+esc(a.delivery_location||'—')+'</strong></div>'+ 
+    '<div class="row"><span>Total client</span><strong>'+money(a.total_amount)+'</strong></div>'+ 
+    '<div class="row"><span>Payé</span><strong>'+money(a.paid_amount)+'</strong></div>'+ 
+    '<div class="row"><span>Reste</span><strong>'+money(a.remaining_amount)+'</strong></div>'+ 
+    '<div class="row"><span>Statut</span><strong>'+esc(status)+'</strong></div></div><div class="small">La vérification confirme que ce numéro existe dans les données CARÈNE et affiche les montants actuellement enregistrés.</div>';
+ }catch(e){
+   console.error(e);result.innerHTML='<div class="seal">!</div><h1>Vérification impossible</h1><div class="status bad">La base CARÈNE n’est pas accessible pour le moment. Réessayez avec Internet.</div>';
+ }
+})();
+</script>
+</body>
+</html>
