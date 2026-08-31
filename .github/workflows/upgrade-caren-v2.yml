@@ -1,0 +1,315 @@
+name: Upgrade Caren Stock V2
+
+on:
+  push:
+    paths:
+      - '.github/workflows/upgrade-caren-v2.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Patch application
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('index.html')
+          s = path.read_text(encoding='utf-8')
+
+          def replace_once(old, new, label):
+              global s
+              if old not in s:
+                  raise SystemExit(f'Motif introuvable: {label}')
+              s = s.replace(old, new, 1)
+
+          # 1. Tableau comptable : ajouter le reste clients.
+          replace_once(
+          '''          <div class="stat"><small>Résultat produits du mois</small><b id="aMonthProfit">0 F</b></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>Ajouter une dépense</h2></div>''',
+          '''          <div class="stat"><small>Résultat produits du mois</small><b id="aMonthProfit">0 F</b></div>
+          <div class="stat"><small>Reste total clients</small><b id="aOutstanding">0 F</b></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>Restes à payer clients</h2></div>
+          <p class="section-sub">Les montants encore dus sont suivis séparément. Un versement met à jour la vente sans la recréer.</p>
+          <div id="outstandingList"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>Ajouter une dépense</h2></div>''',
+          'carte restes clients')
+
+          replace_once(
+          '''<thead><tr><th>Date</th><th>Type</th><th>Détail</th><th>Paiement</th><th>Montant</th><th>Reçu</th></tr></thead>''',
+          '''<thead><tr><th>Date</th><th>Type</th><th>Détail</th><th>Paiement</th><th>Montant</th><th>Actions</th></tr></thead>''',
+          'entête actions comptabilité')
+
+          # 2. Reçu : URL de vérification + QR code.
+          replace_once(
+          ''' const discount=Number(a.discountAmount)||0;
+ const html='<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Reçu '+receiptNumber(a)+'</title>'+''',
+          ''' const discount=Number(a.discountAmount)||0;
+ const verifyUrl=window.location.origin+window.location.pathname+'?receipt='+encodeURIComponent(a.id);
+ const html='<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Reçu '+receiptNumber(a)+'</title>'+''',
+          'URL vérification reçu')
+
+          replace_once(
+          ''' '<div class="line"></div><div class="center muted">Merci pour votre achat.</div>'+\n '<div class="no-print"><button class="btn" onclick="window.print()">Imprimer / Enregistrer PDF</button></div>'+''',
+          ''' '<div class="line"></div><div class="center"><div id="receiptQr" style="width:112px;height:112px;margin:10px auto"></div><div class="muted" style="font-size:10px">Scannez pour vérifier ce reçu dans CARÈNE</div></div>'+\n '<div class="line"></div><div class="center muted">Merci pour votre achat.</div>'+\n '<div class="no-print"><button class="btn" onclick="window.print()">Imprimer / Enregistrer PDF</button></div>'+''',
+          'bloc QR reçu')
+
+          replace_once(
+          ''' w.document.open();w.document.write(html);w.document.close();w.focus();
+}''',
+          ''' w.document.open();w.document.write(html);w.document.close();w.focus();
+ const qrBox=w.document.getElementById('receiptQr');
+ const qrScript=w.document.createElement('script');
+ qrScript.src='https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
+ qrScript.onload=()=>{if(w.QRCode&&qrBox)new w.QRCode(qrBox,{text:verifyUrl,width:112,height:112,correctLevel:w.QRCode.CorrectLevel.M})};
+ w.document.head.appendChild(qrScript);
+}''',
+          'génération QR reçu')
+
+          # 3. Vérification d'un reçu depuis son QR.
+          marker = '''/* MINI COMPTABILITÉ */
+function saleProductAmount(a){'''
+          verification = r'''let receiptVerificationShown=false;
+function checkReceiptVerification(){
+ const id=new URLSearchParams(window.location.search).get('receipt');
+ if(!id||receiptVerificationShown)return;
+ const a=(data.accounts||[]).find(x=>x.type==='INCOME'&&x.id===id);
+ if(!a&&!cloudReady)return;
+ receiptVerificationShown=true;
+ const valid=!!a;
+ const overlay=document.createElement('div');
+ overlay.style.cssText='position:fixed;inset:0;background:rgba(17,24,39,.72);z-index:9999;display:grid;place-items:center;padding:18px';
+ const box=document.createElement('div');
+ box.style.cssText='width:min(430px,100%);background:#fff;border-radius:20px;padding:22px;box-shadow:0 24px 80px rgba(0,0,0,.28)';
+ if(valid){
+   box.innerHTML='<div style="font-size:34px">✓</div><h2 style="margin:6px 0">Reçu CARÈNE vérifié</h2>'+
+    '<div class="notice success">Ce numéro correspond à une vente actuellement enregistrée dans CARÈNE.</div>'+
+    '<div class="summary" style="margin-top:14px">'+summaryRows([
+      ['N°',receiptNumber(a)],['Date',dt(a.date)],['Client',a.customerName||'—'],['Montant total',money(a.amount)],
+      ['Payé',money(a.paidAmount==null?a.amount:a.paidAmount)],['Reste',money(a.remainingAmount||0)]
+    ])+'</div>';
+ }else{
+   box.innerHTML='<div style="font-size:34px">!</div><h2 style="margin:6px 0">Reçu introuvable</h2><div class="notice warning">Ce numéro de reçu n’existe pas dans les données CARÈNE actuellement synchronisées.</div>';
+ }
+ const close=document.createElement('button');close.className='btn';close.style.marginTop='16px';close.textContent='Fermer';
+ close.onclick=()=>{overlay.remove();history.replaceState({},'',window.location.pathname)};
+ box.appendChild(close);overlay.appendChild(box);document.body.appendChild(overlay);
+}
+
+/* MINI COMPTABILITÉ */
+function saleProductAmount(a){'''
+          replace_once(marker, verification, 'vérification QR')
+
+          # 4. Outils paiements + édition complète de vente.
+          marker = '''function renderAccounting(){
+ const q=String($('accountingSearch')?.value||'').trim().toLowerCase();'''
+          tools = r'''function collectPayment(id){
+ const a=(data.accounts||[]).find(x=>x.type==='INCOME'&&x.id===id);if(!a)return;
+ const remaining=Math.max(0,Number(a.remainingAmount)||0);
+ if(remaining<=0){alert('Cette vente est déjà entièrement payée.');return}
+ const raw=prompt('Montant du nouveau versement :',String(remaining));if(raw===null)return;
+ const amount=Number(raw);
+ if(!Number.isFinite(amount)||amount<=0||amount>remaining){alert('Montant invalide. Maximum : '+money(remaining));return}
+ const method=prompt('Moyen de paiement :',a.payment||'Espèces');if(method===null)return;
+ const draft=cloneData(),da=draft.accounts.find(x=>x.id===id);if(!da)return;
+ const total=Number(da.amount)||0;
+ da.paidAmount=Math.min(total,(Number(da.paidAmount)||0)+amount);
+ da.remainingAmount=Math.max(0,total-da.paidAmount);
+ da.paymentStatus=da.remainingAmount===0?'PAID':'PARTIAL';
+ if(method.trim())da.payment=method.trim();
+ const stamp=new Intl.DateTimeFormat('fr-FR',{dateStyle:'short',timeStyle:'short'}).format(new Date());
+ const line='Versement '+money(amount)+' le '+stamp+(method.trim()?' via '+method.trim():'');
+ da.note=[da.note,line].filter(Boolean).join(' | ');
+ if(save(draft))alert(da.remainingAmount===0?'Paiement soldé.':'Versement enregistré. Reste : '+money(da.remainingAmount));
+}
+function editSale(id){
+ const original=(data.accounts||[]).find(x=>x.type==='INCOME'&&x.id===id);if(!original)return;
+ const draft=cloneData(),a=draft.accounts.find(x=>x.id===id);if(!a)return;
+
+ const customer=prompt('Nom du client :',a.customerName||'');if(customer===null)return;
+ const phone=prompt('Téléphone :',a.customerPhone||'');if(phone===null)return;
+ const locationValue=prompt('Lieu de livraison :',a.deliveryLocation||'');if(locationValue===null)return;
+ const deliveryRaw=prompt('Prix de livraison :',String(Number(a.deliveryPrice)||0));if(deliveryRaw===null)return;
+ const delivery=Number(deliveryRaw);if(!Number.isFinite(delivery)||delivery<0){alert('Prix de livraison invalide.');return}
+ const currentDate=localDateValue(new Date(a.date));
+ const dateRaw=prompt('Jour de livraison (AAAA-MM-JJ) :',currentDate);if(dateRaw===null)return;
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(dateRaw)||Number.isNaN(new Date(dateRaw+'T12:00:00').getTime())){alert('Date invalide.');return}
+ const payment=prompt('Moyen de paiement :',a.payment||'Espèces');if(payment===null)return;
+
+ // Quantités et réductions des produits. Chaque changement de quantité recalcule aussi le stock.
+ const items=Array.isArray(a.items)?a.items:[];
+ const movementIds=Array.isArray(a.movementIds)?a.movementIds:[];
+ const previousItemDiscount=items.reduce((sum,i)=>sum+(Number(i.discountAmount)||0),0);
+ const previousGlobal=Math.max(0,(Number(a.discountAmount)||0)-previousItemDiscount);
+ for(let index=0;index<items.length;index++){
+   const item=items[index];
+   const oldQty=positiveInt(item.qty)||1;
+   const movementId=movementIds[index];
+   if(movementId){
+     const qtyRaw=prompt('Quantité — '+(item.name||'Produit')+' :',String(oldQty));if(qtyRaw===null)return;
+     const newQty=positiveInt(qtyRaw);if(newQty===null){alert('Quantité invalide.');return}
+     const diff=newQty-oldQty;
+     const p=draft.products.find(x=>x.id===item.productId);
+     const m=draft.movements.find(x=>x.id===movementId);
+     if(!p||!m){alert('Mouvement de stock lié introuvable. Modification annulée.');return}
+     if(diff>0&&Number(p.stock)<diff){alert('Stock insuffisant pour augmenter '+(item.name||'ce produit')+'. Disponible : '+p.stock);return}
+     p.stock-=diff;
+     m.qty=newQty;
+     m.date=deliveryDateISO(dateRaw);
+     item.qty=newQty;
+     recomputeProductSnapshots(draft,item.productId);
+   }
+   const typeRaw=prompt('Réduction '+(item.name||'produit')+' : NONE, PERCENT ou AMOUNT',item.discountType||'NONE');if(typeRaw===null)return;
+   const type=String(typeRaw).trim().toUpperCase();
+   if(!['NONE','PERCENT','AMOUNT'].includes(type)){alert('Type de réduction invalide.');return}
+   let value=0;
+   if(type!=='NONE'){
+     const valueRaw=prompt(type==='PERCENT'?'Pourcentage de réduction :':'Montant de réduction :',String(Number(item.discountValue)||0));if(valueRaw===null)return;
+     value=Math.max(0,Number(valueRaw)||0);
+   }
+   item.discountType=type;item.discountValue=value;
+   const base=(Number(item.unitPrice)||0)*(Number(item.qty)||0);
+   item.discountAmount=discountAmount(base,type,value);
+   item.total=Math.max(0,base-item.discountAmount);
+ }
+ const globalRaw=prompt('Réduction globale en montant (F) :',String(previousGlobal));if(globalRaw===null)return;
+ const globalFixed=Math.max(0,Number(globalRaw)||0);
+
+ a.customerName=customer.trim();a.customerPhone=phone.trim();a.deliveryLocation=locationValue.trim();a.deliveryPrice=delivery;
+ a.date=deliveryDateISO(dateRaw);a.payment=payment.trim()||a.payment;a.note=String(a.note||'');
+ a.baseAmount=items.reduce((sum,i)=>sum+(Number(i.unitPrice)||0)*(Number(i.qty)||0),0);
+ const itemDiscount=items.reduce((sum,i)=>sum+(Number(i.discountAmount)||0),0);
+ const afterItems=Math.max(0,a.baseAmount-itemDiscount);
+ const appliedGlobal=Math.min(afterItems,globalFixed);
+ a.globalDiscountType=appliedGlobal>0?'AMOUNT':'NONE';a.globalDiscountValue=appliedGlobal;a.globalDiscountAmount=appliedGlobal;
+ a.discountAmount=itemDiscount+appliedGlobal;
+ a.productAmount=Math.max(0,afterItems-appliedGlobal);
+ a.amount=a.productAmount+delivery;
+
+ const statusRaw=prompt('Statut : PAID, PARTIAL ou UNPAID',a.paymentStatus||'PAID');if(statusRaw===null)return;
+ let status=String(statusRaw).trim().toUpperCase();
+ if(!['PAID','PARTIAL','UNPAID'].includes(status)){alert('Statut invalide.');return}
+ let paid=0;
+ if(status==='PAID')paid=a.amount;
+ else if(status==='PARTIAL'){
+   const paidRaw=prompt('Montant déjà payé / avance :',String(Math.min(Number(a.paidAmount)||0,a.amount)));if(paidRaw===null)return;
+   paid=Number(paidRaw);if(!Number.isFinite(paid)||paid<0||paid>a.amount){alert('Montant payé invalide.');return}
+   if(paid===0)status='UNPAID';else if(paid===a.amount)status='PAID';
+ }
+ a.paymentStatus=status;a.paidAmount=status==='PAID'?a.amount:status==='UNPAID'?0:paid;a.remainingAmount=Math.max(0,a.amount-a.paidAmount);
+
+ if(!confirm('Enregistrer toutes les modifications de cette vente ?'))return;
+ if(save(draft))alert('Vente modifiée et calculs recalculés.');
+}
+function renderAccounting(){
+ const q=String($('accountingSearch')?.value||'').trim().toLowerCase();'''
+          replace_once(marker, tools, 'outils paiement et édition vente')
+
+          # 5. Calcul du reste client + liste.
+          replace_once(
+          ''' const monthExpenses=allAccounts.filter(a=>a.type==='EXPENSE'&&monthKey(new Date(a.date))===month).reduce((s,a)=>s+Number(a.amount||0),0);
+ $('aToday').textContent=money(todaySales);''',
+          ''' const monthExpenses=allAccounts.filter(a=>a.type==='EXPENSE'&&monthKey(new Date(a.date))===month).reduce((s,a)=>s+Number(a.amount||0),0);
+ const outstandingSales=allAccounts.filter(a=>a.type==='INCOME'&&Number(a.remainingAmount)>0).sort((a,b)=>new Date(b.date)-new Date(a.date));
+ const outstandingTotal=outstandingSales.reduce((s,a)=>s+(Number(a.remainingAmount)||0),0);
+ $('aToday').textContent=money(todaySales);''',
+          'calcul reste clients')
+
+          replace_once(
+          ''' $('aMonthProfit').textContent=money(monthSales-monthExpenses);
+ $('accountingBody').innerHTML=accounts.length?accounts.slice(0,100).map(a=>`''',
+          ''' $('aMonthProfit').textContent=money(monthSales-monthExpenses);
+ $('aOutstanding').textContent=money(outstandingTotal);
+ $('outstandingList').innerHTML=outstandingSales.length?outstandingSales.slice(0,30).map(a=>`<div class="product-card"><div class="meta"><strong>${esc(a.customerName||'Client non renseigné')}</strong><small>${esc(a.customerPhone||'')} ${a.customerPhone?'• ':''}${dt(a.date)} • Total ${money(a.amount)}</small></div><div class="product-stock"><b>${money(a.remainingAmount)}</b><button class="btn success small" data-collect-payment="${a.id}">Encaisser</button></div></div>`).join(''):'<div class="notice success">Aucun reste à payer.</div>';
+ $('accountingBody').innerHTML=accounts.length?accounts.slice(0,100).map(a=>`''',
+          'affichage reste clients')
+
+          replace_once(
+          '''     <td>${a.type==='INCOME'?'<button class="btn secondary small" data-receipt="'+a.id+'">Imprimer</button>':'—'}</td>
+   </tr>`).join(''):'<tr><td colspan="6" class="empty">Aucune opération comptable.</td></tr>';
+ document.querySelectorAll('[data-receipt]').forEach(b=>b.onclick=()=>{const a=(data.accounts||[]).find(x=>x.id===b.dataset.receipt);if(a)printReceipt(a)});''',
+          '''     <td>${a.type==='INCOME'?'<div class="actions"><button class="btn secondary small" data-edit-sale="'+a.id+'">Modifier</button>'+(Number(a.remainingAmount)>0?'<button class="btn success small" data-collect-payment="'+a.id+'">Encaisser</button>':'')+'<button class="btn secondary small" data-receipt="'+a.id+'">Imprimer</button></div>':'—'}</td>
+   </tr>`).join(''):'<tr><td colspan="6" class="empty">Aucune opération comptable.</td></tr>';
+ document.querySelectorAll('[data-edit-sale]').forEach(b=>b.onclick=()=>editSale(b.dataset.editSale));
+ document.querySelectorAll('[data-collect-payment]').forEach(b=>b.onclick=()=>collectPayment(b.dataset.collectPayment));
+ document.querySelectorAll('[data-receipt]').forEach(b=>b.onclick=()=>{const a=(data.accounts||[]).find(x=>x.id===b.dataset.receipt);if(a)printReceipt(a)});''',
+          'actions vente')
+
+          # 6. Préserver la réduction globale lorsqu'une quantité est modifiée depuis Historique.
+          replace_once(
+          '''function recalcLinkedSale(draft,movement,newQty){
+ const a=draft.accounts.find(x=>x.type==='INCOME'&&(
+   x.movementId===movement.id||(Array.isArray(x.movementIds)&&x.movementIds.includes(movement.id))
+ ));
+ if(!a||!Array.isArray(a.items))return;
+
+ let itemIndex=-1;''',
+          '''function recalcLinkedSale(draft,movement,newQty){
+ const a=draft.accounts.find(x=>x.type==='INCOME'&&(
+   x.movementId===movement.id||(Array.isArray(x.movementIds)&&x.movementIds.includes(movement.id))
+ ));
+ if(!a||!Array.isArray(a.items))return;
+ const beforeProductDiscount=a.items.reduce((s,i)=>s+(Number(i.discountAmount)||0),0);
+ const preservedGlobal=Number.isFinite(Number(a.globalDiscountAmount))?Math.max(0,Number(a.globalDiscountAmount)):Math.max(0,(Number(a.discountAmount)||0)-beforeProductDiscount);
+
+ let itemIndex=-1;''',
+          'préservation réduction globale 1')
+
+          replace_once(
+          ''' const globalDiscount=discountAmount(afterProducts,a.globalDiscountType,a.globalDiscountValue);
+ a.discountAmount=productDiscount+globalDiscount;
+ a.globalDiscountAmount=globalDiscount;''',
+          ''' const globalDiscount=a.globalDiscountType?discountAmount(afterProducts,a.globalDiscountType,a.globalDiscountValue):Math.min(afterProducts,preservedGlobal);
+ a.discountAmount=productDiscount+globalDiscount;
+ a.globalDiscountAmount=globalDiscount;''',
+          'préservation réduction globale 2')
+
+          # 7. Lancer la vérification après une synchro cloud et au chargement local.
+          replace_once(
+          '''   renderAll();
+   setSyncStatus('Synchronisé');''',
+          '''   renderAll();
+   checkReceiptVerification();
+   setSyncStatus('Synchronisé');''',
+          'vérification après cloud')
+
+          replace_once(
+          '''renderAll();
+initCloud();''',
+          '''renderAll();
+checkReceiptVerification();
+initCloud();''',
+          'vérification locale')
+
+          path.write_text(s, encoding='utf-8')
+
+          sw = Path('service-worker.js')
+          sws = sw.read_text(encoding='utf-8')
+          sws = sws.replace("caren-stock-shell-v2", "caren-stock-shell-v3")
+          sw.write_text(sws, encoding='utf-8')
+          PY
+
+      - name: Commit changes
+        shell: bash
+        run: |
+          git config user.name "Caren Stock Bot"
+          git config user.email "actions@github.com"
+          git add index.html service-worker.js
+          git diff --cached --quiet && exit 0
+          git commit -m "Ajouter paiements clients, édition des ventes et QR de vérification"
+          git push
