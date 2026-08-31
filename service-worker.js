@@ -1,12 +1,14 @@
-const CACHE_NAME = 'caren-stock-shell-v4';
+const CACHE_NAME = 'caren-stock-shell-v5';
 const ENHANCEMENT_URL = './enhancements-inline.js';
+const RECEIPT_CONTROLS_URL = './receipt-preview-controls.js';
 const APP_SHELL = [
   './',
   './index.html',
   './verify.html',
   './manifest.webmanifest',
   './icon.svg',
-  ENHANCEMENT_URL
+  ENHANCEMENT_URL,
+  RECEIPT_CONTROLS_URL
 ];
 
 self.addEventListener('install', event => {
@@ -36,34 +38,40 @@ function htmlResponse(text, response) {
   });
 }
 
-async function getEnhancementCode() {
+async function getCode(url) {
   try {
-    const response = await fetch(ENHANCEMENT_URL, { cache: 'no-store' });
+    const response = await fetch(url, { cache: 'no-store' });
     if (response && response.ok) {
       const copy = response.clone();
-      caches.open(CACHE_NAME).then(cache => cache.put(ENHANCEMENT_URL, copy));
+      caches.open(CACHE_NAME).then(cache => cache.put(url, copy));
       return await response.text();
     }
   } catch (_) {}
 
-  const cached = await caches.match(ENHANCEMENT_URL);
+  const cached = await caches.match(url);
   return cached ? await cached.text() : '';
 }
 
 async function enhanceHtmlResponse(response) {
   if (!response) return response;
-  const text = await response.text();
-  if (text.includes('/* CAREN_ENHANCEMENTS_V2 */')) return htmlResponse(text, response);
-
-  const enhancement = await getEnhancementCode();
-  if (!enhancement) return htmlResponse(text, response);
-
+  let text = await response.text();
   const marker = '\nrenderAll();\ninitCloud();';
-  const enhancedText = text.includes(marker)
-    ? text.replace(marker, '\n' + enhancement + marker)
-    : text;
 
-  return htmlResponse(enhancedText, response);
+  if (!text.includes('/* CAREN_ENHANCEMENTS_V2 */')) {
+    const enhancement = await getCode(ENHANCEMENT_URL);
+    if (enhancement && text.includes(marker)) {
+      text = text.replace(marker, '\n' + enhancement + marker);
+    }
+  }
+
+  if (!text.includes('/* CAREN_RECEIPT_PREVIEW_CONTROLS_V1 */')) {
+    const controls = await getCode(RECEIPT_CONTROLS_URL);
+    if (controls && text.includes(marker)) {
+      text = text.replace(marker, '\n' + controls + marker);
+    }
+  }
+
+  return htmlResponse(text, response);
 }
 
 self.addEventListener('fetch', event => {
