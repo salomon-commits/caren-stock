@@ -1010,8 +1010,9 @@ function renderHistory(){
  $('historyBody').innerHTML=items.length?items.map(m=>`
  <tr><td>${dt(m.date)}</td><td>${esc(m.productName)}</td><td>${m.type==='IN'?'<span class="badge ok">Entrée</span>':'<span class="badge zero">Sortie</span>'}</td>
  <td><strong>${m.type==='IN'?'+':'−'}${m.qty}</strong></td><td>${m.stockAfter}</td><td>${esc([m.reason,m.note].filter(Boolean).join(' — ')||'—')}</td>
- <td><button class="btn danger small" data-delete-movement="${m.id}">Supprimer</button></td></tr>`).join('')
+ <td><div class="actions"><button class="btn secondary small" data-edit-movement="${m.id}">Modifier</button><button class="btn danger small" data-delete-movement="${m.id}">Supprimer</button></div></td></tr>`).join('')
  :'<tr><td colspan="7" class="empty">Aucun mouvement.</td></tr>';
+ document.querySelectorAll('[data-edit-movement]').forEach(b=>b.onclick=()=>editMovement(b.dataset.editMovement));
  document.querySelectorAll('[data-delete-movement]').forEach(b=>b.onclick=()=>deleteMovement(b.dataset.deleteMovement));
 }
 function recomputeProductSnapshots(draft,productId){
@@ -1051,6 +1052,93 @@ function updateAccountingAfterMovementDelete(draft,movement){
      a.label='Vente de '+a.items.length+' produit'+(a.items.length>1?'s':'');
    }
  }
+}
+
+function recalcLinkedSale(draft,movement,newQty){
+ const a=draft.accounts.find(x=>x.type==='INCOME'&&(
+   x.movementId===movement.id||(Array.isArray(x.movementIds)&&x.movementIds.includes(movement.id))
+ ));
+ if(!a||!Array.isArray(a.items))return;
+
+ let itemIndex=-1;
+ if(Array.isArray(a.movementIds)){
+   const pos=a.movementIds.indexOf(movement.id);
+   if(pos>=0&&a.items[pos])itemIndex=pos;
+ }
+ if(itemIndex<0)itemIndex=a.items.findIndex(i=>i.productId===movement.productId);
+ if(itemIndex<0)return;
+
+ const item=a.items[itemIndex];
+ item.qty=newQty;
+ const base=(Number(item.unitPrice)||0)*newQty;
+ item.discountAmount=discountAmount(base,item.discountType,item.discountValue);
+ item.total=Math.max(0,base-item.discountAmount);
+
+ a.baseAmount=a.items.reduce((s,i)=>s+(Number(i.unitPrice)||0)*(Number(i.qty)||0),0);
+ const productDiscount=a.items.reduce((s,i)=>s+(Number(i.discountAmount)||0),0);
+ const afterProducts=Math.max(0,a.baseAmount-productDiscount);
+ const globalDiscount=discountAmount(afterProducts,a.globalDiscountType,a.globalDiscountValue);
+ a.discountAmount=productDiscount+globalDiscount;
+ a.globalDiscountAmount=globalDiscount;
+ a.productAmount=Math.max(0,afterProducts-globalDiscount);
+
+ const delivery=Number(a.deliveryPrice)||0;
+ a.amount=a.productAmount+delivery;
+
+ if(a.paymentStatus==='PAID'){
+   a.paidAmount=a.amount;
+   a.remainingAmount=0;
+ }else if(a.paymentStatus==='PARTIAL'){
+   a.paidAmount=Math.min(Number(a.paidAmount)||0,a.amount);
+   a.remainingAmount=Math.max(0,a.amount-a.paidAmount);
+ }else{
+   a.paidAmount=0;
+   a.remainingAmount=a.amount;
+ }
+}
+function editMovement(id){
+ const m=data.movements.find(x=>x.id===id);if(!m)return;
+ const p=productById(m.productId);if(!p){alert('Produit lié introuvable. Modification annulée.');return}
+
+ const qtyInput=prompt('Quantité :',String(m.qty));
+ if(qtyInput===null)return;
+ const newQty=positiveInt(qtyInput);
+ if(newQty===null){alert('La quantité doit être un nombre entier supérieur à 0.');return}
+
+ const reasonInput=prompt('Motif :',m.reason||'');
+ if(reasonInput===null)return;
+ const noteInput=prompt('Note :',m.note||'');
+ if(noteInput===null)return;
+
+ const oldQty=positiveInt(m.qty);
+ if(oldQty===null){alert('Mouvement invalide. Modification annulée.');return}
+
+ const delta=newQty-oldQty;
+ let newStock=Number(p.stock)||0;
+ if(m.type==='IN')newStock+=delta;
+ else newStock-=delta;
+
+ if(newStock<0){
+   alert('Modification impossible : le stock deviendrait négatif.');
+   return;
+ }
+
+ if(!confirm('Enregistrer cette modification ? Le stock et la comptabilité liés seront recalculés.'))return;
+
+ const draft=cloneData();
+ const dm=draft.movements.find(x=>x.id===id);
+ const dp=draft.products.find(x=>x.id===m.productId);
+ if(!dm||!dp){alert('Données liées introuvables.');return}
+
+ dp.stock=newStock;
+ dm.qty=newQty;
+ dm.reason=reasonInput.trim();
+ dm.note=noteInput.trim();
+
+ if(dm.type==='OUT')recalcLinkedSale(draft,dm,newQty);
+ recomputeProductSnapshots(draft,dm.productId);
+
+ if(save(draft))alert('Mouvement modifié.');
 }
 function deleteMovement(id){
  const m=data.movements.find(x=>x.id===id);if(!m)return;
