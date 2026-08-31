@@ -228,4 +228,109 @@
   const originalPullCloudData=pullCloudData;
   pullCloudData=async function(){const result=await originalPullCloudData.apply(this,arguments);checkReceiptVerification();return result};
   setTimeout(checkReceiptVerification,0);
+
+  /* CAREN_MOBILE_UX_V3 */
+  const mobileUxStyle=document.createElement('style');
+  mobileUxStyle.textContent=\`
+    .btn:disabled{opacity:.42;cursor:not-allowed;box-shadow:none!important;transform:none!important}
+    @media(max-width:560px){
+      .topbar{height:74px;padding:0 12px;gap:8px;position:sticky}
+      .topbar>div:first-child{min-width:0;flex:1}
+      .topbar h1{font-size:18px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-bottom:15px}
+      .topbar>div:last-child{flex:0 0 auto;gap:5px!important}
+      .topbar .sync-status{position:absolute;left:13px;bottom:7px;font-size:9px;line-height:1;color:#6b7280}
+      .topbar .btn.small{padding:8px 10px;font-size:11px;white-space:nowrap;border-radius:10px}
+      .topbar #installAppBtn:not([hidden]){display:none}
+      .content{padding-top:14px}
+      .section-title{font-size:20px}
+    }
+    @media(max-width:700px){
+      #page-history .table-wrap,#page-accounting .table-wrap,#page-products .table-wrap{border:0;overflow:visible}
+      #page-history table,#page-accounting table,#page-products table{display:block;min-width:0;width:100%}
+      #page-history thead,#page-accounting thead,#page-products thead{display:none}
+      #page-history tbody,#page-accounting tbody,#page-products tbody{display:grid;gap:10px}
+      #page-history tr,#page-accounting tr,#page-products tr{display:block;background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px 12px;box-shadow:0 6px 18px rgba(17,24,39,.04)}
+      #page-history td,#page-accounting td,#page-products td{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:7px 0;border-bottom:1px dashed #e5e7eb;font-size:12px;text-align:right}
+      #page-history td:last-child,#page-accounting td:last-child,#page-products td:last-child{border-bottom:0;padding-bottom:0}
+      #page-history td::before,#page-accounting td::before,#page-products td::before{font-size:10px;font-weight:800;color:#6b7280;text-align:left;flex:0 0 88px}
+      #page-history td:nth-child(1)::before{content:"Date"}
+      #page-history td:nth-child(2)::before{content:"Produit"}
+      #page-history td:nth-child(3)::before{content:"Type"}
+      #page-history td:nth-child(4)::before{content:"Quantité"}
+      #page-history td:nth-child(5)::before{content:"Stock après"}
+      #page-history td:nth-child(6)::before{content:"Détail"}
+      #page-history td:nth-child(7)::before{content:"Actions"}
+      #page-accounting td:nth-child(1)::before{content:"Date"}
+      #page-accounting td:nth-child(2)::before{content:"Type"}
+      #page-accounting td:nth-child(3)::before{content:"Détail"}
+      #page-accounting td:nth-child(4)::before{content:"Paiement"}
+      #page-accounting td:nth-child(5)::before{content:"Montant"}
+      #page-accounting td:nth-child(6)::before{content:"Actions"}
+      #page-products td:nth-child(1)::before{content:"Produit"}
+      #page-products td:nth-child(2)::before{content:"Catégorie"}
+      #page-products td:nth-child(3)::before{content:"Format"}
+      #page-products td:nth-child(4)::before{content:"Prix"}
+      #page-products td:nth-child(5)::before{content:"Stock"}
+      #page-products td:nth-child(6)::before{content:"État"}
+      #page-products td:nth-child(7)::before{content:"Actions"}
+      #page-history .actions,#page-accounting .actions,#page-products .actions{justify-content:flex-end}
+      #page-history td.empty,#page-accounting td.empty,#page-products td.empty{display:block;text-align:center}
+      #page-history td.empty::before,#page-accounting td.empty::before,#page-products td.empty::before{display:none}
+      #page-history .toolbar,#page-accounting .toolbar,#page-products .toolbar{align-items:stretch}
+      #page-history .toolbar>div,#page-history .toolbar .search,#page-accounting .toolbar .search,#page-products .toolbar .search{width:100%;max-width:none}
+    }
+  \`;
+  document.head.appendChild(mobileUxStyle);
+
+  const dashboardGrid=$('page-dashboard')?.querySelector('.grid4');
+  if(dashboardGrid&&!$('dZero')){
+    const lowCard=$('dLow')?.closest('.stat');
+    if(lowCard)lowCard.insertAdjacentHTML('afterend','<div class="stat"><small>Ruptures</small><b id="dZero">0</b></div>');
+  }
+  const previousRenderDashboard=renderDashboard;
+  renderDashboard=function(){
+    previousRenderDashboard();
+    const zero=data.products.filter(p=>Number(p.stock)===0).length;
+    const low=data.products.filter(p=>Number(p.stock)>0&&Number(p.stock)<=Number(p.threshold)).length;
+    if($('dZero'))$('dZero').textContent=zero;
+    if($('dLow'))$('dLow').textContent=low;
+  };
+
+  function refreshWizardAvailability(){
+    const entryNext=document.querySelector('#page-entry [data-entry-panel="1"] [data-enext]');
+    if(entryNext){
+      entryNext.disabled=entryCart.length===0;
+      entryNext.setAttribute('aria-disabled',entryNext.disabled?'true':'false');
+    }
+    const exitNext=document.querySelector('#page-exit [data-exit-panel="1"] [data-xnext]');
+    if(exitNext){
+      exitNext.disabled=exitCart.length===0;
+      exitNext.setAttribute('aria-disabled',exitNext.disabled?'true':'false');
+    }
+  }
+
+  const previousRenderEntryPicker=renderEntryPicker;
+  renderEntryPicker=function(){
+    previousRenderEntryPicker();
+    refreshWizardAvailability();
+  };
+
+  const previousRenderExitPicker=renderExitPicker;
+  renderExitPicker=function(){
+    previousRenderExitPicker();
+    document.querySelectorAll('[data-exit-add]').forEach(button=>{
+      const product=productById(button.dataset.exitAdd);
+      const selected=exitCart.some(i=>i.productId===button.dataset.exitAdd);
+      if(product&&Number(product.stock)<=0&&!selected){
+        button.disabled=true;
+        button.textContent='Rupture';
+        button.classList.add('secondary');
+        button.setAttribute('aria-label',(product.name||'Produit')+' en rupture');
+      }
+    });
+    refreshWizardAvailability();
+  };
+
+  refreshWizardAvailability();
+
 })();
