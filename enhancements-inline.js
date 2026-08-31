@@ -243,6 +243,15 @@
       .topbar #installAppBtn:not([hidden]){display:none}
       .content{padding-top:14px}
       .section-title{font-size:20px}
+      #page-entry .picker-list,#page-exit .picker-list{padding-bottom:92px}
+      #page-entry [data-entry-panel="1"] .wizard-actions,
+      #page-exit [data-exit-panel="1"] .wizard-actions{
+        position:sticky;bottom:84px;z-index:6;
+        padding:12px 0 4px;
+        background:linear-gradient(to bottom,rgba(255,255,255,0),#fff 28%);
+      }
+      #page-entry [data-entry-panel="1"] .wizard-actions .btn,
+      #page-exit [data-exit-panel="1"] .wizard-actions .btn{min-width:150px}
     }
     @media(max-width:700px){
       #page-history .table-wrap,#page-accounting .table-wrap,#page-products .table-wrap{border:0;overflow:visible}
@@ -331,6 +340,91 @@
     refreshWizardAvailability();
   };
 
+
   refreshWizardAvailability();
+
+  /* CAREN_STOCK_CONSISTENCY_V1 */
+  function latestMovementByProduct(){
+    const map=new Map();
+    for(const m of (data.movements||[])){
+      const prev=map.get(m.productId);
+      if(!prev||new Date(m.date)>new Date(prev.date))map.set(m.productId,m);
+    }
+    return map;
+  }
+
+  function repairStockFromHistory(){
+    if(!Array.isArray(data.products)||!Array.isArray(data.movements))return 0;
+    const latest=latestMovementByProduct();
+    let changed=0;
+    const draft=cloneData();
+    for(const p of draft.products){
+      const m=latest.get(p.id);
+      if(!m)continue;
+      const expected=nonNegativeInt(m.stockAfter);
+      if(expected===null)continue;
+      if(Number(p.stock)!==expected){
+        p.stock=expected;
+        changed++;
+      }
+    }
+    if(changed){
+      data=draft;
+      try{localStorage.setItem(KEY,JSON.stringify(draft))}catch(_){}
+      renderAll();
+      if(cloudReady){cloudDirty=true;scheduleCloudSync()}
+    }
+    return changed;
+  }
+
+  function installStockCorrectionButtons(){
+    document.querySelectorAll('[data-edit]').forEach(btn=>{
+      const cell=btn.closest('.actions');
+      if(!cell||cell.querySelector('[data-correct-stock]'))return;
+      const p=productById(btn.dataset.edit);if(!p)return;
+      const b=document.createElement('button');
+      b.className='btn secondary small';
+      b.dataset.correctStock=p.id;
+      b.textContent='Corriger stock';
+      b.onclick=()=>{
+        const current=productById(p.id);if(!current)return;
+        const raw=prompt('Stock physique réel pour '+current.name+' :',String(current.stock));
+        if(raw===null)return;
+        const value=nonNegativeInt(raw);
+        if(value===null){alert('Le stock doit être un nombre entier positif ou nul.');return}
+        if(value===Number(current.stock))return;
+        if(!confirm('Remplacer le stock de '+current.name+' par '+value+' ? Une correction sera ajoutée à l’historique.'))return;
+        const draft=cloneData(),dp=draft.products.find(x=>x.id===current.id);
+        const old=Number(dp.stock)||0;
+        const diff=value-old;
+        dp.stock=value;
+        draft.movements.unshift({
+          id:uid(),productId:dp.id,productName:dp.name,
+          type:diff>=0?'IN':'OUT',qty:Math.abs(diff),stockAfter:value,
+          reason:'Correction inventaire',note:'Stock physique corrigé de '+old+' à '+value,
+          date:new Date().toISOString()
+        });
+        recomputeProductSnapshots(draft,dp.id);
+        if(save(draft))alert('Stock corrigé.');
+      };
+      cell.insertBefore(b,cell.firstChild);
+    });
+  }
+
+  const previousRenderProductsMobileUx=renderProducts;
+  renderProducts=function(){
+    previousRenderProductsMobileUx();
+    installStockCorrectionButtons();
+  };
+
+  const previousPullCloudDataMobileUx=pullCloudData;
+  pullCloudData=async function(){
+    const result=await previousPullCloudDataMobileUx.apply(this,arguments);
+    repairStockFromHistory();
+    installStockCorrectionButtons();
+    return result;
+  };
+
+  setTimeout(()=>{repairStockFromHistory();installStockCorrectionButtons()},0);
 
 })();
