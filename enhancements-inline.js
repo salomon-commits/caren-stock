@@ -343,6 +343,47 @@
 
   refreshWizardAvailability();
 
+
+  /* CAREN_EXIT_BY_PRODUCT_V1 */
+  const historyPage=$('page-history');
+  if(historyPage&&!$('exitByProductList')){
+    const firstCard=historyPage.querySelector('.card');
+    if(firstCard){
+      firstCard.insertAdjacentHTML('beforebegin',
+        '<div class="card" id="exitByProductCard">'+
+          '<div class="card-head"><h2>Sorties par produit</h2><span class="badge ok" id="exitByProductTotal">0 unité</span></div>'+
+          '<p class="section-sub">Total des unités sorties pour chaque produit.</p>'+
+          '<div id="exitByProductList"></div>'+
+        '</div>'
+      );
+    }
+  }
+
+  function renderExitByProduct(){
+    if(!$('exitByProductList'))return;
+    const totals=new Map();
+    for(const m of (data.movements||[])){
+      if(m.type!=='OUT')continue;
+      const id=m.productId||m.productName;
+      if(!totals.has(id))totals.set(id,{name:m.productName||productById(m.productId)?.name||'Produit',qty:0});
+      totals.get(id).qty+=Number(m.qty)||0;
+    }
+    const rows=[...totals.values()].sort((a,b)=>b.qty-a.qty);
+    const grand=rows.reduce((s,x)=>s+x.qty,0);
+    if($('exitByProductTotal'))$('exitByProductTotal').textContent=grand+' unité'+(grand>1?'s':'');
+    $('exitByProductList').innerHTML=rows.length?rows.map(x=>
+      '<div class="product-card"><div class="meta"><strong>'+esc(x.name)+'</strong><small>Quantité totale sortie</small></div><div class="product-stock"><b>'+x.qty+'</b><span class="badge zero">sortie'+(x.qty>1?'s':'')+'</span></div></div>'
+    ).join(''):'<div class="notice">Aucune sortie enregistrée.</div>';
+  }
+
+  const previousRenderHistoryExitTotals=renderHistory;
+  renderHistory=function(){
+    previousRenderHistoryExitTotals();
+    renderExitByProduct();
+  };
+  renderExitByProduct();
+
+
   /* CAREN_STOCK_CONSISTENCY_V1 */
   function latestMovementByProduct(){
     const map=new Map();
