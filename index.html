@@ -1009,7 +1009,7 @@ function renderHistory(){
  const items=data.movements.filter(m=>(!type||m.type===type)&&((m.productName+' '+(m.reason||'')+' '+(m.note||'')).toLowerCase().includes(q)));
  $('historyBody').innerHTML=items.length?items.map(m=>`
  <tr><td>${dt(m.date)}</td><td>${esc(m.productName)}</td><td>${m.type==='IN'?'<span class="badge ok">Entrée</span>':'<span class="badge zero">Sortie</span>'}</td>
- <td><strong>${m.type==='IN'?'+':'−'}${m.qty}</strong></td><td>${m.stockAfter}</td><td>${esc([m.reason,m.note].filter(Boolean).join(' — ')||'—')}</td>
+ <td><strong>${m.qty}</strong></td><td>${m.stockAfter}</td><td>${esc([m.reason,m.note].filter(Boolean).join(' — ')||'—')}</td>
  <td><div class="actions"><button class="btn secondary small" data-edit-movement="${m.id}">Modifier</button><button class="btn danger small" data-delete-movement="${m.id}">Supprimer</button></div></td></tr>`).join('')
  :'<tr><td colspan="7" class="empty">Aucun mouvement.</td></tr>';
  document.querySelectorAll('[data-edit-movement]').forEach(b=>b.onclick=()=>editMovement(b.dataset.editMovement));
