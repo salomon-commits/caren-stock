@@ -598,8 +598,42 @@ function load(){
  return x;
 }
 function cloneData(v=data){return JSON.parse(JSON.stringify(v))}
+
+function normalizeStockState(source){
+ const draft=cloneData(source);
+ let changed=false;
+ for(const p of draft.products){
+   const indexed=draft.movements
+     .map((m,index)=>({m,index}))
+     .filter(x=>x.m.productId===p.id)
+     .sort((a,b)=>{
+       const ta=new Date(a.m.date).getTime(),tb=new Date(b.m.date).getTime();
+       if(ta!==tb)return ta-tb;
+       return b.index-a.index;
+     });
+   if(!indexed.length)continue;
+
+   const first=indexed[0].m;
+   const firstQty=Number(first.qty)||0;
+   const firstAfter=Number(first.stockAfter)||0;
+   let running=first.type==='IN'?firstAfter-firstQty:firstAfter+firstQty;
+   if(!Number.isFinite(running))continue;
+   running=Math.max(0,running);
+
+   for(const entry of indexed){
+     const m=entry.m,q=Number(m.qty)||0;
+     running=m.type==='IN'?running+q:running-q;
+     running=Math.max(0,running);
+     if(Number(m.stockAfter)!==running){m.stockAfter=running;changed=true}
+   }
+   if(Number(p.stock)!==running){p.stock=running;changed=true}
+ }
+ return {data:draft,changed};
+}
 function save(next=data){
  try{
+   const normalized=normalizeStockState(next);
+   next=normalized.data;
    const serialized=JSON.stringify(next);
    localStorage.setItem(KEY,serialized);
    if(localStorage.getItem(KEY)!==serialized) throw new Error('Écriture incomplète');
@@ -821,12 +855,19 @@ async function pullCloudData(allowMigration=true){
      await uploadInitialLocalState();
    }
    const remote=await fetchCloudState();
-   data=remote;
-   cloudBaseline=cloneData(remote);
-   cloudDirty=false;
-   localStorage.setItem(KEY,JSON.stringify(remote));
+   const baseline=cloneData(remote);
+   const normalized=normalizeStockState(remote);
+   data=normalized.data;
+   cloudBaseline=baseline;
+   cloudDirty=normalized.changed;
+   localStorage.setItem(KEY,JSON.stringify(data));
    renderAll();
-   setSyncStatus('Synchronisé');
+   if(normalized.changed){
+     setSyncStatus('Correction stock…');
+     scheduleCloudSync();
+   }else{
+     setSyncStatus('Synchronisé');
+   }
  }catch(err){
    console.error('Supabase pull:',err);
    setSyncStatus(navigator.onLine?'Erreur cloud':'Hors ligne');
