@@ -1416,7 +1416,7 @@ $('confirmExit').onclick=()=>{
  }
  btn.dataset.busy='1';btn.disabled=true;
  const draft=cloneData(),now=new Date().toISOString(),reason=$('exitReason').value,note=$('exitNote').value.trim();
- const saleMovementDate=deliveryDateISO($('exitSaleDate').value);
+ const saleMovementDate=now;
  const movementIds=[];
  for(const i of exitCart){
    const p=draft.products.find(x=>x.id===i.productId),q=positiveInt(i.qty);
