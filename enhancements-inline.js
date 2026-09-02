@@ -354,27 +354,10 @@
   }
 
   function repairStockFromHistory(){
-    if(!Array.isArray(data.products)||!Array.isArray(data.movements))return 0;
-    const latest=latestMovementByProduct();
-    let changed=0;
-    const draft=cloneData();
-    for(const p of draft.products){
-      const m=latest.get(p.id);
-      if(!m)continue;
-      const expected=nonNegativeInt(m.stockAfter);
-      if(expected===null)continue;
-      if(Number(p.stock)!==expected){
-        p.stock=expected;
-        changed++;
-      }
-    }
-    if(changed){
-      data=draft;
-      try{localStorage.setItem(KEY,JSON.stringify(draft))}catch(_){}
-      renderAll();
-      if(cloudReady){cloudDirty=true;scheduleCloudSync()}
-    }
-    return changed;
+    // Désactivé : stockAfter est un instantané d'historique, pas une source de vérité
+    // fiable quand plusieurs mouvements ont la même date. Le stock courant reste
+    // celui de products.stock et chaque entrée/sortie l'ajuste directement.
+    return 0;
   }
 
   function installStockCorrectionButtons(){
@@ -420,11 +403,10 @@
   const previousPullCloudDataMobileUx=pullCloudData;
   pullCloudData=async function(){
     const result=await previousPullCloudDataMobileUx.apply(this,arguments);
-    repairStockFromHistory();
     installStockCorrectionButtons();
     return result;
   };
 
-  setTimeout(()=>{repairStockFromHistory();installStockCorrectionButtons()},0);
+  setTimeout(()=>{installStockCorrectionButtons()},0);
 
 })();
