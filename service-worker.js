@@ -1,4 +1,4 @@
-const CACHE_NAME = 'caren-stock-shell-v14';
+const CACHE_NAME = 'caren-stock-shell-v15';
 const ENHANCEMENT_URL = './enhancements-inline.js';
 const RECEIPT_CONTROLS_URL = './receipt-preview-controls.js';
 const APP_SHELL = [
