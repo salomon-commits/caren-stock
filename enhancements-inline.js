@@ -384,6 +384,118 @@
   renderExitByProduct();
 
 
+
+  /* CAREN_DUPLICATE_EXIT_V1 */
+  function aggregateSaleItems(a){
+    const map=new Map();
+    for(const i of (Array.isArray(a.items)?a.items:[])){
+      const key=String(i.productId||i.name||'').trim();
+      if(!key)continue;
+      const row=map.get(key)||{name:i.name||productById(i.productId)?.name||'Produit',qty:0};
+      row.qty+=Number(i.qty)||0;
+      map.set(key,row);
+    }
+    return [...map.entries()].map(([key,v])=>({key,name:v.name,qty:v.qty})).sort((a,b)=>a.key.localeCompare(b.key));
+  }
+
+  function saleDuplicateSignature(a){
+    const day=localDateValue(new Date(a.date));
+    const customer=(a.customerPhone||a.customerName||'').trim().toLowerCase();
+    const items=aggregateSaleItems(a).map(x=>x.key+':'+x.qty).join('|');
+    const total=Number(a.amount)||0;
+    const delivery=Number(a.deliveryPrice)||0;
+    return [day,customer,items,total,delivery].join('||');
+  }
+
+  function findDuplicateSaleGroups(){
+    const groups=new Map();
+    for(const a of (data.accounts||[])){
+      if(a.type!=='INCOME')continue;
+      const sig=saleDuplicateSignature(a);
+      if(!groups.has(sig))groups.set(sig,[]);
+      groups.get(sig).push(a);
+    }
+    return [...groups.values()].filter(g=>g.length>1).sort((a,b)=>new Date(b[0].date)-new Date(a[0].date));
+  }
+
+  const historyPageDup=$('page-history');
+  if(historyPageDup&&!$('duplicateExitList')){
+    const ref=$('exitByProductCard')||historyPageDup.querySelector('.card');
+    if(ref){
+      ref.insertAdjacentHTML('afterend',
+        '<div class="card" id="duplicateExitCard">'+
+          '<div class="card-head"><h2>Doublons possibles de sortie</h2><span class="badge low" id="duplicateExitCount">0</span></div>'+
+          '<p class="section-sub">Même jour, même client, mêmes produits et quantités, même total. Vérifiez avant de supprimer.</p>'+
+          '<div id="duplicateExitList"></div>'+
+        '</div>'
+      );
+    }
+  }
+
+  function renderDuplicateExits(){
+    if(!$('duplicateExitList'))return;
+    const groups=findDuplicateSaleGroups();
+    if($('duplicateExitCount'))$('duplicateExitCount').textContent=groups.length+' groupe'+(groups.length>1?'s':'');
+    $('duplicateExitList').innerHTML=groups.length?groups.map(group=>{
+      const a=group[0];
+      const itemText=aggregateSaleItems(a).map(x=>x.name+' × '+x.qty).join(', ');
+      return '<div class="product-card" style="align-items:flex-start"><div class="meta"><strong>'+esc(a.customerName||a.customerPhone||'Client non renseigné')+'</strong><small>'+esc(localDateValue(new Date(a.date)))+' • '+esc(itemText)+' • '+money(a.amount)+'</small><small style="margin-top:4px">Enregistré '+group.length+' fois</small></div><div class="product-stock"><span class="badge low">À vérifier</span></div></div>';
+    }).join(''):'<div class="notice success">Aucun doublon évident détecté.</div>';
+  }
+
+  const previousRenderExitByProductV2=renderExitByProduct;
+  renderExitByProduct=function(){
+    if(!$('exitByProductList'))return;
+    const totals=new Map();
+    for(const m of (data.movements||[])){
+      if(m.type!=='OUT')continue;
+      const id=m.productId||m.productName;
+      const row=totals.get(id)||{name:m.productName||productById(m.productId)?.name||'Produit',qty:0,operations:0};
+      row.qty+=Number(m.qty)||0;
+      row.operations+=1;
+      totals.set(id,row);
+    }
+    const rows=[...totals.values()].sort((a,b)=>b.qty-a.qty);
+    const grand=rows.reduce((s,x)=>s+x.qty,0);
+    if($('exitByProductTotal'))$('exitByProductTotal').textContent=grand+' unité'+(grand>1?'s':'');
+    $('exitByProductList').innerHTML=rows.length?rows.map(x=>
+      '<div class="product-card"><div class="meta"><strong>'+esc(x.name)+'</strong><small>'+x.operations+' mouvement'+(x.operations>1?'s':'')+' de sortie</small></div><div class="product-stock"><b>'+x.qty+'</b><span class="badge zero">unité'+(x.qty>1?'s':'')+'</span></div></div>'
+    ).join(''):'<div class="notice">Aucune sortie enregistrée.</div>';
+    renderDuplicateExits();
+  };
+
+  function duplicateCandidateForCurrentExit(){
+    if(!isSaleReason())return null;
+    const fake={
+      type:'INCOME',
+      date:deliveryDateISO($('exitSaleDate').value),
+      customerName:$('exitCustomerName').value.trim(),
+      customerPhone:$('exitCustomerPhone').value.trim(),
+      deliveryPrice:Math.max(0,Number($('exitDeliveryPrice').value)||0),
+      amount:exitTotals().total+Math.max(0,Number($('exitDeliveryPrice').value)||0),
+      items:exitCart.map(i=>{const p=productById(i.productId);return {productId:i.productId,name:p?.name||'',qty:positiveInt(i.qty)||0}})
+    };
+    const sig=saleDuplicateSignature(fake);
+    return (data.accounts||[]).find(a=>a.type==='INCOME'&&saleDuplicateSignature(a)===sig)||null;
+  }
+
+  const confirmExitButton=$('confirmExit');
+  if(confirmExitButton){
+    const oldConfirmExit=confirmExitButton.onclick;
+    confirmExitButton.onclick=function(ev){
+      const dup=duplicateCandidateForCurrentExit();
+      if(dup){
+        const details=aggregateSaleItems(dup).map(x=>x.name+' × '+x.qty).join(', ');
+        const proceed=confirm('Attention : une sortie très similaire existe déjà.\\n\\n'+details+'\\nTotal : '+money(dup.amount)+'\\nClient : '+(dup.customerName||dup.customerPhone||'non renseigné')+'\\n\\nVoulez-vous vraiment enregistrer cette sortie une deuxième fois ?');
+        if(!proceed)return;
+      }
+      return oldConfirmExit.call(this,ev);
+    };
+  }
+
+  renderDuplicateExits();
+
+
   /* CAREN_STOCK_CONSISTENCY_V1 */
   function latestMovementByProduct(){
     const map=new Map();
