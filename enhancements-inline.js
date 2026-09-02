@@ -496,6 +496,69 @@
   renderDuplicateExits();
 
 
+
+  /* CAREN_STOCK_AUDIT_V1 */
+  const historyAuditPage=$('page-history');
+  if(historyAuditPage&&!$('stockAuditList')){
+    const ref=$('duplicateExitCard')||$('exitByProductCard')||historyAuditPage.querySelector('.card');
+    if(ref){
+      ref.insertAdjacentHTML('afterend',
+        '<div class="card" id="stockAuditCard">'+
+          '<div class="card-head"><h2>Contrôle de cohérence du stock</h2><span class="badge ok" id="stockAuditBadge">0 écart</span></div>'+
+          '<p class="section-sub">Calcul : stock de départ estimé + entrées − sorties = stock théorique.</p>'+
+          '<div id="stockAuditList"></div>'+
+        '</div>'
+      );
+    }
+  }
+
+  function stockAuditForProduct(p){
+    const moves=(data.movements||[]).filter(m=>m.productId===p.id).slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
+    if(!moves.length){
+      return {name:p.name,start:null,ins:0,outs:0,theoretical:Number(p.stock)||0,current:Number(p.stock)||0,diff:0,hasHistory:false};
+    }
+    const first=moves[0];
+    const firstQty=Number(first.qty)||0;
+    const firstAfter=Number(first.stockAfter)||0;
+    const start=first.type==='IN'?firstAfter-firstQty:firstAfter+firstQty;
+    const ins=moves.filter(m=>m.type==='IN').reduce((s,m)=>s+(Number(m.qty)||0),0);
+    const outs=moves.filter(m=>m.type==='OUT').reduce((s,m)=>s+(Number(m.qty)||0),0);
+    const theoretical=start+ins-outs;
+    const current=Number(p.stock)||0;
+    return {name:p.name,start,ins,outs,theoretical,current,diff:current-theoretical,hasHistory:true};
+  }
+
+  function renderStockAudit(){
+    if(!$('stockAuditList'))return;
+    const rows=(data.products||[]).map(stockAuditForProduct);
+    const discrepancies=rows.filter(x=>x.hasHistory&&x.diff!==0);
+    if($('stockAuditBadge')){
+      $('stockAuditBadge').textContent=discrepancies.length+' écart'+(discrepancies.length>1?'s':'');
+      $('stockAuditBadge').className='badge '+(discrepancies.length?'low':'ok');
+    }
+    const ordered=rows.slice().sort((a,b)=>{
+      const ad=Math.abs(a.diff),bd=Math.abs(b.diff);
+      if(bd!==ad)return bd-ad;
+      return a.name.localeCompare(b.name);
+    });
+    $('stockAuditList').innerHTML=ordered.map(x=>{
+      const status=!x.hasHistory?'Pas d’historique':x.diff===0?'Cohérent':'Écart '+(x.diff>0?'+':'')+x.diff;
+      const badgeClass=!x.hasHistory?'low':x.diff===0?'ok':'zero';
+      const calc=x.hasHistory
+        ? 'Départ '+x.start+' • Entrées +'+x.ins+' • Sorties −'+x.outs+' • Théorique '+x.theoretical+' • Actuel '+x.current
+        : 'Stock actuel '+x.current+' • Impossible de recalculer sans historique';
+      return '<div class="product-card" style="align-items:flex-start"><div class="meta"><strong>'+esc(x.name)+'</strong><small>'+esc(calc)+'</small></div><div class="product-stock"><span class="badge '+badgeClass+'">'+esc(status)+'</span></div></div>';
+    }).join('');
+  }
+
+  const previousRenderHistoryAudit=renderHistory;
+  renderHistory=function(){
+    previousRenderHistoryAudit();
+    renderStockAudit();
+  };
+  renderStockAudit();
+
+
   /* CAREN_STOCK_CONSISTENCY_V1 */
   function latestMovementByProduct(){
     const map=new Map();
