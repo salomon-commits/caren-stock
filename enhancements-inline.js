@@ -559,6 +559,27 @@
   renderStockAudit();
 
 
+
+  /* CAREN_STOCK_AUDIT_RELOCATE_V1 */
+  function relocateStockAudit(){
+    const audit=$('stockAuditCard');
+    const productsPage=$('page-products');
+    if(!audit||!productsPage)return;
+    const firstCard=productsPage.querySelector('.card');
+    if(firstCard&&audit.parentElement!==productsPage){
+      productsPage.insertBefore(audit,firstCard.nextSibling);
+    }
+  }
+  relocateStockAudit();
+
+  const previousRenderProductsAuditRelocate=renderProducts;
+  renderProducts=function(){
+    previousRenderProductsAuditRelocate();
+    relocateStockAudit();
+    renderStockAudit();
+  };
+
+
   /* CAREN_STOCK_CONSISTENCY_V1 */
   function latestMovementByProduct(){
     const map=new Map();
