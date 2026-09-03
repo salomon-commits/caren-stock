@@ -1,6 +1,7 @@
-const CACHE_NAME = 'caren-stock-shell-v16';
+const CACHE_NAME = 'caren-stock-shell-v17';
 const ENHANCEMENT_URL = './enhancements-inline.js';
 const RECEIPT_CONTROLS_URL = './receipt-preview-controls.js';
+const PREMIUM_UI_URL = './premium-ui.css';
 const APP_SHELL = [
   './',
   './index.html',
@@ -8,7 +9,8 @@ const APP_SHELL = [
   './manifest.webmanifest',
   './icon.svg',
   ENHANCEMENT_URL,
-  RECEIPT_CONTROLS_URL
+  RECEIPT_CONTROLS_URL,
+  PREMIUM_UI_URL
 ];
 
 self.addEventListener('install', event => {
@@ -56,6 +58,10 @@ async function enhanceHtmlResponse(response) {
   if (!response) return response;
   let text = await response.text();
   const marker = '\nrenderAll();\ninitCloud();';
+
+  if (!text.includes('premium-ui.css')) {
+    text = text.replace('</head>', '<link rel="stylesheet" href="./premium-ui.css?v=17"></head>');
+  }
 
   if (!text.includes('/* CAREN_ENHANCEMENTS_V2 */')) {
     const enhancement = await getCode(ENHANCEMENT_URL);
