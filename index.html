@@ -151,6 +151,49 @@ tr:last-child td{border-bottom:0}
   .step{font-size:10px}.step .dot{width:24px;height:24px}.step::after{margin-left:4px}
   .topbar p{display:none}
 }
+
+/* Finition responsive mobile et hiérarchie visuelle */
+:root{--bg:#f3f5f9;--line:#e4e8ef;--shadow:0 8px 24px rgba(15,23,42,.045)}
+button,.btn,.quick button,.product-card,.picker-item{transition:background .18s ease,border-color .18s ease,box-shadow .18s ease,transform .18s ease}
+button:focus-visible,.btn:focus-visible{outline:3px solid rgba(37,99,235,.35);outline-offset:2px}
+.content{width:100%}.stat{min-width:0;overflow:hidden}.stat b{overflow-wrap:anywhere;line-height:1.15}
+.card{min-width:0}.toolbar>*{min-width:0}.table-wrap{-webkit-overflow-scrolling:touch}
+.quick{grid-template-columns:repeat(2,minmax(0,1fr))}
+.quick button{min-height:100px;box-shadow:0 2px 8px rgba(15,23,42,.025)}
+.quick button strong{line-height:1.35}.section-title{font-size:22px;letter-spacing:-.035em}
+.section-sub{line-height:1.55}#deleteAllDataBtn{min-height:44px}
+.mobile-nav button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;line-height:1.15}
+@media(min-width:901px){.content{padding:30px 32px 60px}.quick{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:900px){
+ body{font-size:15px}.topbar{padding:0 14px;gap:10px}.topbar h1{font-size:18px;letter-spacing:-.025em}
+ .topbar>div:last-child{gap:6px!important}#quickBackup{display:none}
+ .content{padding:18px 12px calc(104px + env(safe-area-inset-bottom))}
+ .grid4{gap:10px}.stat{padding:14px;border-radius:16px}.stat small{font-size:11px;line-height:1.35;display:block}
+ .stat b{font-size:clamp(20px,5vw,26px);margin-top:7px}
+ .quick{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+ .quick button{padding:13px;min-height:104px;border-radius:15px}.quick button strong{font-size:14px}
+ .quick button span{font-size:11px;line-height:1.45;display:block}
+ .card{padding:15px;margin-top:14px;border-radius:16px}.card-head{align-items:flex-start}
+ .toolbar{align-items:stretch}.toolbar .search{max-width:none;flex:1 1 100%}
+ .toolbar #startAddProduct{width:100%}.table-wrap{margin-left:-2px;margin-right:-2px}
+ th,td{padding:10px;font-size:12px}
+ .mobile-nav{grid-template-columns:repeat(5,minmax(0,1fr));padding:7px 5px calc(7px + env(safe-area-inset-bottom));min-height:68px;gap:2px}
+ .mobile-nav button{padding:7px 2px;min-height:48px;font-size:11px;border-radius:11px;white-space:nowrap}
+ .sync-status{font-size:10px}.steps{gap:4px}.step{gap:5px;min-width:0;font-size:10px}
+ .step::after{margin-left:2px}.picker-item{padding:11px;gap:8px}.product-card{align-items:flex-start}
+ .cart-controls{grid-template-columns:minmax(0,1fr) auto}
+}
+@media(max-width:560px){
+ .form-row{grid-template-columns:minmax(0,1fr)}.grid4{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .content{padding-left:10px;padding-right:10px}.section-title{font-size:20px}
+ .section-sub{font-size:12px;margin-bottom:15px}.card h2{font-size:15px}
+ .wizard-actions .btn{min-height:44px}input,select,textarea{min-height:44px}
+ .steps{margin-bottom:18px}.step{font-size:9px}.step .dot{width:23px;height:23px;flex:0 0 23px}
+ .summary-row{gap:8px;font-size:12px}.product-stock b{font-size:18px}
+ .actions .btn{min-height:36px}.mobile-nav button{font-size:10px}
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}
+
 </style>
 </head>
 <body>
@@ -753,21 +796,32 @@ async function syncSale(a){
 }
 async function syncDelta(prev,next){
  const pp=recordsMap(prev.products),np=recordsMap(next.products);
- for(const [id,p] of np){await syncProduct(pp.get(id),p,next)}
- for(const [id,p] of pp){if(!np.has(id)){const {error}=await sb.from('products').delete().eq('id',id);if(error)throw error}}
-
  const pm=recordsMap(prev.movements),nm=recordsMap(next.movements);
- for(const [id,m] of nm){
-   if(!pm.has(id)||recordChanged(pm.get(id),m)){const {error}=await sb.from('stock_movements').upsert(toMovementRow(m));if(error)throw error}
- }
- for(const [id,m] of pm){if(!nm.has(id)){const {error}=await sb.from('stock_movements').delete().eq('id',id);if(error)throw error}}
-
  const pa=recordsMap(prev.accounts),na=recordsMap(next.accounts);
+
+ // Supprimer les lignes enfants avant leurs parents pour respecter les clés étrangères.
+ for(const [id,a] of pa){
+   if(!na.has(id)&&a.type==='INCOME'){
+     const {error}=await sb.from('sale_items').delete().eq('sale_id',id);
+     if(error)throw error;
+   }
+ }
  for(const [id,a] of pa){
    if(!na.has(id)){
      const table=a.type==='EXPENSE'?'expenses':'sales';
-     const {error}=await sb.from(table).delete().eq('id',id);if(error)throw error;
+     const {error}=await sb.from(table).delete().eq('id',id);
+     if(error)throw error;
    }
+ }
+ for(const [id,m] of pm){
+   if(!nm.has(id)){const {error}=await sb.from('stock_movements').delete().eq('id',id);if(error)throw error}
+ }
+ for(const [id,p] of pp){
+   if(!np.has(id)){const {error}=await sb.from('products').delete().eq('id',id);if(error)throw error}
+ }
+ for(const [id,p] of np){await syncProduct(pp.get(id),p,next)}
+ for(const [id,m] of nm){
+   if(!pm.has(id)||recordChanged(pm.get(id),m)){const {error}=await sb.from('stock_movements').upsert(toMovementRow(m));if(error)throw error}
  }
  for(const [id,a] of na){
    if(!pa.has(id)||recordChanged(pa.get(id),a)){
@@ -1693,7 +1747,7 @@ $('deleteAllDataBtn').onclick=async()=>{
  }catch(err){
    console.error('Suppression totale:',err);
    setSyncStatus('Erreur de suppression');
-   alert("La suppression n'a pas pu être confirmée sur le cloud. Vérifiez votre connexion et les droits de la base avant de réessayer. Certaines données peuvent encore être présentes.");
+   alert("La suppression n'a pas pu être confirmée sur le cloud. Vérifiez Internet et les autorisations Supabase (DELETE sur products, stock_movements, sales, sale_items et expenses), puis réessayez. Certaines données peuvent encore être présentes.");
  }finally{
    button.disabled=false;
    button.textContent='Tout effacer, y compris les produits';
