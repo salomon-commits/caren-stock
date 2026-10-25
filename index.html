@@ -166,7 +166,7 @@ button:focus-visible,.btn:focus-visible{outline:3px solid rgba(37,99,235,.35);ou
 @media(min-width:901px){.content{padding:30px 32px 60px}.quick{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:900px){
  body{font-size:15px}.topbar{padding:0 14px;gap:10px}.topbar h1{font-size:18px;letter-spacing:-.025em}
- .topbar>div:last-child{gap:6px!important}#quickBackup{display:none}#refreshSyncBtn{font-size:11px;padding:8px 9px;white-space:nowrap}
+ .topbar>div:last-child{gap:6px!important}#quickBackup{display:none}#resetCloudCatalogBtn{font-size:11px;padding:8px 9px;white-space:nowrap}#refreshSyncBtn{font-size:11px;padding:8px 9px;white-space:nowrap}
  .content{padding:18px 12px calc(104px + env(safe-area-inset-bottom))}
  .grid4{gap:10px}.stat{padding:14px;border-radius:16px}.stat small{font-size:11px;line-height:1.35;display:block}
  .stat b{font-size:clamp(20px,5vw,26px);margin-top:7px}
@@ -269,6 +269,7 @@ button:focus-visible,.btn:focus-visible{outline:3px solid rgba(37,99,235,.35);ou
       <div style="display:flex;gap:8px;align-items:center">
         <span class="sync-status" id="syncStatus">Local</span>
         <button class="btn small" id="installAppBtn" hidden>Installer</button>
+        <button class="btn danger small" id="resetCloudCatalogBtn" title="Effacer l'ancien catalogue et repartir avec les 17 produits officiels à stock zéro">Réinitialiser le cloud</button>
         <button class="btn secondary small" id="refreshSyncBtn" title="Récupérer le cloud, appliquer le catalogue officiel et synchroniser">↻ Synchroniser</button>
         <button class="btn secondary small" id="quickBackup">Sauvegarder</button>
       </div>
@@ -1100,6 +1101,46 @@ if(mobileMoreBtn){
 document.querySelectorAll('.sidebar [data-page], .mobile-nav [data-page]').forEach(b=>b.onclick=()=>gotoPage(b.dataset.page));
 document.querySelectorAll('[data-goto]').forEach(b=>b.onclick=()=>gotoPage(b.dataset.goto));
 
+const resetCloudCatalogBtn=$('resetCloudCatalogBtn');
+if(resetCloudCatalogBtn){
+ resetCloudCatalogBtn.addEventListener('click',async()=>{
+   if(!navigator.onLine||!sb||!cloudReady){alert('Connexion au cloud nécessaire. Attends que l’application soit connectée puis réessaie.');return}
+   if(cloudSyncing||cloudDirty){alert('Une synchronisation est en cours ou des changements ne sont pas encore envoyés. Attends que le statut affiche « Synchronisé », puis réessaie.');return}
+   const phrase=prompt('ATTENTION : cette opération efface définitivement du cloud tous les produits, stocks, mouvements, ventes, lignes de vente et dépenses. Le catalogue sera remplacé par les 17 produits officiels, tous à stock zéro. Pour continuer, tape exactement VIDER LE CLOUD');
+   if(phrase!=='VIDER LE CLOUD')return;
+   if(!confirm('Dernière confirmation : l’ancien catalogue et tout l’historique cloud seront supprimés pour TOUS les appareils. Continuer ?'))return;
+   resetCloudCatalogBtn.disabled=true;resetCloudCatalogBtn.textContent='Réinitialisation…';
+   cloudSyncing=true;setSyncStatus('Réinitialisation cloud…');
+   try{
+     // Supprimer les enfants avant les parents. Chaque requête est filtrée pour supprimer toutes les lignes.
+     const operations=[
+       ()=>sb.from('sale_items').delete().not('sale_id','is',null),
+       ()=>sb.from('stock_movements').delete().not('id','is',null),
+       ()=>sb.from('sales').delete().not('id','is',null),
+       ()=>sb.from('expenses').delete().not('id','is',null),
+       ()=>sb.from('products').delete().not('id','is',null)
+     ];
+     for(const operation of operations){const {error}=await operation();if(error)throw error}
+     const clean={
+       products:BASE_CATALOG.map(p=>({...p,stock:0,threshold:5,createdAt:new Date().toISOString()})),
+       movements:[],accounts:[],catalogVersion:3,priceCatalogVersion:3
+     };
+     const {error:insertError}=await sb.from('products').insert(clean.products.map(toProductRow));
+     if(insertError)throw insertError;
+     data=cloneData(clean);cloudBaseline=cloneData(clean);cloudDirty=false;
+     try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){throw new Error('Cloud réinitialisé, mais impossible d’écrire le cache local : '+e.message)}
+     entryCart=[];exitCart=[];productStep=1;entryStep=1;exitStep=1;
+     renderAll();setSyncStatus('Synchronisé');
+     alert('Réinitialisation terminée. L’ancien catalogue et l’historique ont été supprimés du cloud. Les 17 produits officiels sont présents avec un stock de zéro. Les autres appareils les recevront à leur prochaine synchronisation.');
+   }catch(err){
+     console.error('Reset cloud catalog:',err);
+     setSyncStatus('Erreur cloud');
+     alert('La réinitialisation n’a pas pu être confirmée : '+(err&&err.message?err.message:'erreur inconnue')+'. Vérifie Supabase. La suppression peut avoir été partielle ; ne relance pas plusieurs fois sans vérifier.');
+   }finally{
+     cloudSyncing=false;resetCloudCatalogBtn.disabled=false;resetCloudCatalogBtn.textContent='Réinitialiser le cloud';
+   }
+ });
+}
 const refreshSyncBtn=$('refreshSyncBtn');
 if(refreshSyncBtn){
  refreshSyncBtn.addEventListener('click',async()=>{
