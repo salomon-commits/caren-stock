@@ -1028,7 +1028,7 @@ if(mobileMoreBtn){
  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMobileMore()});
 }
 
-document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>gotoPage(b.dataset.page));
+document.querySelectorAll('.sidebar [data-page], .mobile-nav [data-page]').forEach(b=>b.onclick=()=>gotoPage(b.dataset.page));
 document.querySelectorAll('[data-goto]').forEach(b=>b.onclick=()=>gotoPage(b.dataset.goto));
 
 function renderAll(){
