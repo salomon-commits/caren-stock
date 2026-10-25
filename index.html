@@ -272,7 +272,6 @@ button:focus-visible,.btn:focus-visible{outline:3px solid rgba(37,99,235,.35);ou
       <div style="display:flex;gap:8px;align-items:center">
         <span class="sync-status" id="syncStatus">Local</span>
         <button class="btn small" id="installAppBtn" hidden>Installer</button>
-        <button class="btn danger small" id="resetCloudCatalogBtn" title="Effacer l'ancien catalogue et repartir avec les 17 produits officiels à stock zéro">Réinitialiser le cloud</button>
         <button class="btn secondary small" id="refreshSyncBtn" title="Récupérer le cloud, appliquer le catalogue officiel et synchroniser">↻ Synchroniser</button>
         <button class="btn secondary small" id="quickBackup">Sauvegarder</button>
       </div>
@@ -362,7 +361,7 @@ button:focus-visible,.btn:focus-visible{outline:3px solid rgba(37,99,235,.35);ou
       <!-- ENTRY -->
       <section class="page" id="page-entry">
         <h2 class="section-title">Entrée de stock</h2>
-        <p class="section-sub">Sélectionnez un ou plusieurs produits puis indiquez les quantités reçues.</p>
+        
         <div class="card wizard" style="margin-top:0">
           <div class="steps" id="entrySteps">
             <div class="step active" data-step="1"><span class="dot">1</span>Produits</div>
@@ -375,7 +374,7 @@ button:focus-visible,.btn:focus-visible{outline:3px solid rgba(37,99,235,.35);ou
               <label>Rechercher un produit</label>
               <input id="entrySearch" placeholder="Nom, catégorie ou format...">
             </div>
-            <p class="picker-help">Touchez <strong>Ajouter</strong> à côté de chaque produit reçu. Vous pourrez ensuite saisir les quantités.</p>
+            
             <div class="selected-count" id="entrySelectedCount">Aucun produit choisi</div>
             <button class="btn picker-next" data-enext>Continuer vers les quantités →</button>
             <div class="picker-list" id="entryProductList"></div>
@@ -400,7 +399,7 @@ button:focus-visible,.btn:focus-visible{outline:3px solid rgba(37,99,235,.35);ou
       <!-- EXIT -->
       <section class="page" id="page-exit">
         <h2 class="section-title">Sortie / Livraison</h2>
-        <p class="section-sub">Ajoutez plusieurs produits à la même sortie ou à la même vente.</p>
+        
         <div class="card wizard" style="margin-top:0">
           <div class="steps" id="exitSteps">
             <div class="step active" data-step="1"><span class="dot">1</span>Produits</div>
@@ -413,7 +412,7 @@ button:focus-visible,.btn:focus-visible{outline:3px solid rgba(37,99,235,.35);ou
               <label>Rechercher un produit</label>
               <input id="exitSearch" placeholder="Nom, catégorie ou format...">
             </div>
-            <p class="picker-help">Touchez <strong>+</strong> pour ajouter les produits qui sortent du stock. Le stock disponible est indiqué sous chaque nom.</p>
+            
             <div class="selected-count" id="exitSelectedCount"><span>Aucun produit choisi</span><strong>0 F</strong></div>
             <button class="btn picker-next" data-xnext>Continuer vers les détails →</button>
             <div class="picker-list" id="exitProductList"></div>
@@ -585,7 +584,8 @@ button:focus-visible,.btn:focus-visible{outline:3px solid rgba(37,99,235,.35);ou
         </div>
         <div class="card" style="border-color:#fecaca">
           <h2 style="color:#b42318">Zone dangereuse</h2>
-          <p class="section-sub">Efface définitivement tous les produits, quantités, mouvements, ventes, dépenses et l'historique, sur cet appareil et dans le cloud. Cette action est irréversible.</p>
+          <button class="btn danger small" id="resetCloudCatalogBtn" title="Remplacer le catalogue cloud par les 17 produits officiels à stock zéro">Réinitialiser le catalogue cloud</button>
+          <p class="section-sub" style="margin-top:8px">Remplace les produits et l’historique du cloud pour tous les appareils.</p>
           <button class="btn danger" id="deleteAllDataBtn">Tout effacer, y compris les produits</button>
         </div>
       </section>
@@ -1529,7 +1529,7 @@ function renderEntryCart(){
      </div>
    </div>`;
  }).join('');
- document.querySelectorAll('[data-entry-remove]').forEach(b=>b.onclick=()=>{entryCart=entryCart.filter(i=>i.productId!==b.dataset.entryRemove);renderEntryCart();renderEntryPicker()});
+ document.querySelectorAll('[data-entry-remove]').forEach(b=>b.onclick=()=>{entryCart=entryCart.filter(i=>i.productId!==b.dataset.entryRemove);if(entryCart.length===0){entryStep=1;$('entryReason').value='Réapprovisionnement';$('entryNote').value='';renderEntryStep()}renderEntryCart();renderEntryPicker()});
  document.querySelectorAll('[data-entry-qty]').forEach(inp=>{
    inp.oninput=()=>{
      const i=entryCart.find(x=>x.productId===inp.dataset.entryQty);
@@ -1556,6 +1556,7 @@ function renderEntryCart(){
 $('entrySearch').oninput=renderEntryPicker;
 document.querySelectorAll('[data-enext]').forEach(b=>b.onclick=()=>{
  if(entryStep===1&&entryCart.length===0){alert('Sélectionnez au moins un produit.');return}
+ if(entryStep===2&&entryCart.length===0){entryStep=1;$('entryReason').value='Réapprovisionnement';$('entryNote').value='';renderEntryStep();renderEntryPicker();return}
  if(entryStep===2&&entryCart.some(i=>positiveInt(i.qty)===null)){alert('Les quantités doivent être des nombres entiers supérieurs à 0.');return}
  entryStep=Math.min(3,entryStep+1);renderEntryStep()
 });
