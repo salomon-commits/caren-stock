@@ -248,7 +248,7 @@ button:focus-visible,.btn:focus-visible{outline:3px solid rgba(37,99,235,.35);ou
 </head>
 <body>
 <div class="welcome-toast" id="dailyWelcome" role="status" aria-live="polite">
-  <div aria-hidden="true">✦</div><div><strong>Bon courage avec MonStock !</strong><span id="dailyWelcomeText">Chaque petit progrès compte. Vous avancez pas à pas.</span></div>
+  <div aria-hidden="true">♥</div><div><strong>Bon courage, mon cœur ❤️</strong><span id="dailyWelcomeText">Je crois en toi. Avance à ton rythme, mon amour.</span></div>
 </div>
 <div class="app">
   <aside class="sidebar">
@@ -1039,20 +1039,26 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 
 function showDailyWelcome(){
  const messages=[
-  "Chaque petit progrès compte. Vous avancez pas à pas.",
-  "Un stock bien suivi, c'est une entreprise qui avance. Bon travail !",
-  "Prenez les choses une par une : vous êtes capable d'y arriver.",
-  "Chaque effort d'aujourd'hui prépare les réussites de demain.",
-  "Vous faites avancer votre activité. Continuez à votre rythme.",
-  "Un petit pas bien fait vaut mieux qu'une grande hésitation.",
-  "Votre travail compte. Gardez le cap et bon courage !",
-  "Avec de la régularité, les choses deviennent plus simples.",
-  "Vous n'avez pas besoin de tout faire d'un coup. Avancez tranquillement.",
-  "Aujourd'hui est une nouvelle occasion de bien gérer votre activité.",
-  "Votre sérieux d'aujourd'hui construit votre réussite de demain.",
-  "Continuez, même les petites avancées sont importantes.",
-  "MonStock est là pour vous aider. Faites une chose à la fois.",
-  "Bon courage ! Vous êtes en train de bâtir quelque chose de solide."
+  "Je crois en toi. Avance à ton rythme, mon amour.",
+  "Tu es capable de belles choses. Je suis fier de toi, mon cœur.",
+  "Un pas après l'autre, tu vas y arriver. Je t'encourage toujours.",
+  "N'oublie pas que tu es forte, précieuse et aimée.",
+  "Que ta journée soit douce. Bon courage, mon cœur.",
+  "Même quand c'est difficile, rappelle-toi que je crois en toi.",
+  "Fais de ton mieux sans te mettre trop de pression. Je t'aime.",
+  "Chaque effort que tu fais compte. Continue, mon amour.",
+  "Tu n'as pas besoin d'être parfaite : avance simplement avec confiance.",
+  "Je t'envoie toute ma force et beaucoup d'amour pour aujourd'hui.",
+  "Prends les choses tranquillement. Tu es plus capable que tu ne le crois.",
+  "Je suis de tout cœur avec toi. Bon courage, ma chérie.",
+  "Que Dieu fortifie tes mains et bénisse le travail de cette journée.",
+  "Tu es une bénédiction dans ma vie. Courage et belle journée, mon cœur.",
+  "Respire, souris et avance à ton rythme. Je crois en toi.",
+  "Ton travail et tes efforts ont de la valeur. Ne baisse pas les bras.",
+  "Peu importe la difficulté du jour, tu n'es pas seule. Je t'aime.",
+  "Que cette journée t'apporte la paix, la force et de belles surprises.",
+  "Je t'admire pour les efforts que tu fais. Continue, mon amour.",
+  "Bon courage, mon cœur. Un nouveau jour, une nouvelle force et tout mon amour."
  ];
  const start=new Date(new Date().getFullYear(),0,0);
  const day=Math.floor((new Date()-start)/86400000);
