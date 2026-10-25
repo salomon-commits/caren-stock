@@ -483,6 +483,11 @@ tr:last-child td{border-bottom:0}
           <p class="section-sub">Créez un fichier CSV lisible dans Excel.</p>
           <button class="btn secondary" id="exportStock">Exporter le stock CSV</button>
         </div>
+        <div class="card" style="border-color:#fecaca">
+          <h2 style="color:#b42318">Zone dangereuse</h2>
+          <p class="section-sub">Efface définitivement tous les produits, quantités, mouvements, ventes, dépenses et l'historique, sur cet appareil et dans le cloud. Cette action est irréversible.</p>
+          <button class="btn danger" id="deleteAllDataBtn">Tout effacer, y compris les produits</button>
+        </div>
       </section>
     </main>
   </div>
@@ -1654,6 +1659,46 @@ function download(name,content,type){
 }
 function backup(){download(`sauvegarde-stock-${dayKey()}.json`,JSON.stringify(data,null,2),'application/json')}
 $('backupBtn').onclick=backup;$('quickBackup').onclick=backup;
+
+$('deleteAllDataBtn').onclick=async()=>{
+ if(!cloudReady||!sb){
+   alert("Suppression totale impossible tant que la connexion au cloud n'est pas établie. Connectez-vous à Internet, attendez le statut « Synchronisé », puis réessayez. Cela évite que les anciennes données du cloud réapparaissent.");
+   return;
+ }
+ if(cloudSyncing||cloudDirty){
+   alert("Une synchronisation est en cours ou en attente. Attendez que le statut indique « Synchronisé », puis réessayez.");
+   return;
+ }
+ const phrase=prompt("ATTENTION : toutes les données seront supprimées sur cet appareil et dans le cloud, y compris les produits.\n\nPour confirmer, tapez exactement : EFFACER");
+ if(phrase!=='EFFACER')return;
+ if(!confirm("Dernière confirmation : supprimer définitivement tous les produits, stocks, ventes, dépenses et historiques ? Cette action ne peut pas être annulée."))return;
+ const button=$('deleteAllDataBtn');
+ button.disabled=true;
+ button.textContent='Suppression en cours…';
+ setSyncStatus('Suppression…');
+ try{
+   const remote=await fetchCloudState();
+   const empty={products:[],movements:[],accounts:[],catalogVersion:1,priceCatalogVersion:1};
+   await syncDelta(remote,empty);
+   clearTimeout(cloudSyncTimer);
+   cloudDirty=false;
+   cloudBaseline=cloneData(empty);
+   data=cloneData(empty);
+   entryCart=[];exitCart=[];
+   entryStep=1;exitStep=1;productStep=1;
+   localStorage.setItem(KEY,JSON.stringify(data));
+   renderAll();
+   setSyncStatus('Synchronisé');
+   alert("Toutes les données ont été supprimées, y compris les produits. Le catalogue ne sera pas recréé automatiquement.");
+ }catch(err){
+   console.error('Suppression totale:',err);
+   setSyncStatus('Erreur de suppression');
+   alert("La suppression n'a pas pu être confirmée sur le cloud. Vérifiez votre connexion et les droits de la base avant de réessayer. Certaines données peuvent encore être présentes.");
+ }finally{
+   button.disabled=false;
+   button.textContent='Tout effacer, y compris les produits';
+ }
+};
 function validBackup(x){
  if(!x||!Array.isArray(x.products)||!Array.isArray(x.movements))return false;
  if(!Array.isArray(x.accounts))x.accounts=[];
