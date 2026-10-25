@@ -958,10 +958,9 @@ async function pullCloudData(allowMigration=true){
  if(cloudSyncing)return;
  setSyncStatus('Chargement cloud…');
  try{
-   if(allowMigration&&await cloudIsEmpty()&&(data.products.length||data.movements.length||data.accounts.length)){
-     setSyncStatus('Migration vers le cloud…');
-     await uploadInitialLocalState();
-   }
+   // Le cloud est la source de vérité après connexion.
+   // Ne jamais réimporter automatiquement un ancien localStorage si le cloud est vide :
+   // cela ressusciterait des données déjà supprimées sur un autre appareil.
    const remote=await fetchCloudState();
    const baseline=cloneData(remote);
    const normalized=normalizeStockState(remote);
