@@ -166,7 +166,7 @@ button:focus-visible,.btn:focus-visible{outline:3px solid rgba(37,99,235,.35);ou
 @media(min-width:901px){.content{padding:30px 32px 60px}.quick{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:900px){
  body{font-size:15px}.topbar{padding:0 14px;gap:10px}.topbar h1{font-size:18px;letter-spacing:-.025em}
- .topbar>div:last-child{gap:6px!important}#quickBackup{display:none}
+ .topbar>div:last-child{gap:6px!important}#quickBackup{display:none}#refreshSyncBtn{font-size:11px;padding:8px 9px;white-space:nowrap}
  .content{padding:18px 12px calc(104px + env(safe-area-inset-bottom))}
  .grid4{gap:10px}.stat{padding:14px;border-radius:16px}.stat small{font-size:11px;line-height:1.35;display:block}
  .stat b{font-size:clamp(20px,5vw,26px);margin-top:7px}
@@ -269,6 +269,7 @@ button:focus-visible,.btn:focus-visible{outline:3px solid rgba(37,99,235,.35);ou
       <div style="display:flex;gap:8px;align-items:center">
         <span class="sync-status" id="syncStatus">Local</span>
         <button class="btn small" id="installAppBtn" hidden>Installer</button>
+        <button class="btn secondary small" id="refreshSyncBtn" title="Récupérer le cloud, appliquer le catalogue officiel et synchroniser">↻ Synchroniser</button>
         <button class="btn secondary small" id="quickBackup">Sauvegarder</button>
       </div>
     </header>
@@ -693,7 +694,7 @@ function load(){
      (target==='savon noir'&&n==='savon noir') ||
      (target==='crème au beurre'&&n==='crème au beurre');
  };
- if(x.priceCatalogVersion!==2){
+ if(x.priceCatalogVersion!==3){
    BASE_CATALOG.forEach(item=>{
      let match=x.products.find(p=>matchesOfficial(p,item));
      if(match){
@@ -703,16 +704,16 @@ function load(){
        match.price=item.price;
      }
    });
-   x.priceCatalogVersion=2;
+   x.priceCatalogVersion=3;
  }
- if(x.catalogVersion!==2){
+ if(x.catalogVersion!==3){
    BASE_CATALOG.forEach(item=>{
      let match=x.products.find(p=>matchesOfficial(p,item));
      if(!match){
        x.products.push({...item,stock:0,threshold:5,createdAt:new Date().toISOString()});
      }
    });
-   x.catalogVersion=2;
+   x.catalogVersion=3;
  }
  try{localStorage.setItem(KEY,JSON.stringify(x))}catch(_){}
 
@@ -953,30 +954,58 @@ async function uploadInitialLocalState(){
    else await syncSale(a);
  }
 }
+function reconcileOfficialCatalog(source){
+ const next=cloneData(source);
+ const norm=v=>String(v||'').trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/\\s+/g,' ');
+ const aliases={
+  'creme luxury':['creme luxury','luxury cream'],
+  'gel luxurious':['gel luxurious'],
+  'savon pinkie':['sacon pinkie','savon pinkie','pinkie'],
+  'savon illuminateur':['savon illuminateur'],
+  'creme au beurre':['creme au beurre','creme au beurre adulte'],
+  'savon noir':['savon noir'],
+  'lait lactea':['lait lactea','lait lactea opal'],
+  'gommage':['gommage'],
+  'huile traditionnelle':['huile traditionnelle'],
+  'recharge huile traditionnelle':['recharge huile traditionnelle'],
+  'creme au beurre +':['creme au beurre +','creme au beurre plus'],
+  'creme glow':['creme glow','creme glow hydratante corporelle'],
+  'creme au beurre enfant':['creme au beurre enfant'],
+  'creme visage eclaircissante':['creme visage eclaircissante'],
+  'creme visage marron caramel':['creme visage marron caramel'],
+  'savon visage':['savon visage'],
+  'moisturizing face cream':['moisturizing face cream']
+ };
+ BASE_CATALOG.forEach(item=>{
+   const key=norm(item.name), options=(aliases[key]||[key]).map(norm);
+   let match=next.products.find(p=>options.includes(norm(p.name)));
+   if(match){
+     match.name=item.name;match.category=item.category;match.format=item.format;match.price=item.price;
+   }else{
+     next.products.push({...item,stock:0,threshold:5,createdAt:new Date().toISOString()});
+   }
+ });
+ next.catalogVersion=3;next.priceCatalogVersion=3;
+ return next;
+}
 async function pullCloudData(allowMigration=true){
  if(!sb)return;
  if(cloudSyncing)return;
  setSyncStatus('Chargement cloud…');
  try{
-   // Le cloud est la source de vérité après connexion.
-   // Ne jamais réimporter automatiquement un ancien localStorage si le cloud est vide :
-   // cela ressusciterait des données déjà supprimées sur un autre appareil.
    const remote=await fetchCloudState();
-   const baseline=cloneData(remote);
-   const normalized=normalizeStockState(remote);
-   data=normalized.data;
-   cloudBaseline=baseline;
-   cloudDirty=normalized.changed;
+   const target=reconcileOfficialCatalog(remote);
+   // Le cloud reste la source de vérité pour les stocks et les historiques.
+   // Seuls les noms/prix officiels et les produits manquants sont réconciliés.
+   await syncDelta(remote,target);
+   data=cloneData(target);
+   cloudBaseline=cloneData(target);
+   cloudDirty=false;
    localStorage.setItem(KEY,JSON.stringify(data));
    renderAll();
-   if(normalized.changed){
-     setSyncStatus('Correction stock…');
-     scheduleCloudSync();
-   }else{
-     setSyncStatus('Synchronisé');
-   }
+   setSyncStatus('Synchronisé');
  }catch(err){
-   console.error('Supabase pull:',err);
+   console.error('Supabase pull/catalogue:',err);
    setSyncStatus(navigator.onLine?'Erreur cloud':'Hors ligne');
  }
 }
@@ -1071,6 +1100,21 @@ if(mobileMoreBtn){
 document.querySelectorAll('.sidebar [data-page], .mobile-nav [data-page]').forEach(b=>b.onclick=()=>gotoPage(b.dataset.page));
 document.querySelectorAll('[data-goto]').forEach(b=>b.onclick=()=>gotoPage(b.dataset.goto));
 
+const refreshSyncBtn=$('refreshSyncBtn');
+if(refreshSyncBtn){
+ refreshSyncBtn.addEventListener('click',async()=>{
+   if(!navigator.onLine){alert('Connexion Internet nécessaire pour synchroniser le catalogue avec le cloud.');return}
+   if(cloudSyncing){alert('Une synchronisation est déjà en cours. Attends quelques secondes.');return}
+   refreshSyncBtn.disabled=true;refreshSyncBtn.textContent='Synchronisation…';
+   try{
+     await pullCloudData(true);
+     if($('syncStatus').textContent!=='Synchronisé')throw new Error('La synchronisation cloud n’a pas été confirmée.');
+     alert('Synchronisation terminée. Le catalogue officiel et les données du cloud sont actualisés.');
+   }catch(err){
+     console.error(err);alert('La synchronisation a échoué. Vérifie la connexion et les autorisations Supabase, puis réessaie.');
+   }finally{refreshSyncBtn.disabled=false;refreshSyncBtn.textContent='↻ Synchroniser'}
+ });
+}
 function renderAll(){
  renderDashboard();renderProducts();renderSelects();renderHistory();renderAccounting();renderAssistant();
 }
