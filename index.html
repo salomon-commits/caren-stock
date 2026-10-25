@@ -110,8 +110,8 @@ tr:last-child td{border-bottom:0}
 .section-title{margin-bottom:6px}.section-sub{margin:0 0 20px;color:var(--muted);font-size:13px}
 .actions{display:flex;gap:6px;flex-wrap:wrap}
 .positive{color:var(--success)}.negative{color:var(--danger)}
-.picker-list{display:grid;gap:9px;max-height:430px;overflow:auto;margin-top:12px}
-.picker-item{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);border-radius:13px;padding:12px;background:#fff}
+.picker-list{display:grid;gap:9px;max-height:none;overflow:visible;margin-top:12px}
+.picker-item{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);border-radius:13px;padding:14px;background:#fff;min-height:76px}.picker-item .info strong{font-size:14px;line-height:1.35}.picker-item .info small{display:block;margin-top:5px;line-height:1.4}.picker-item .btn{flex-shrink:0;min-width:94px}
 .picker-item .info{min-width:0}.picker-item strong{display:block}.picker-item small{color:var(--muted)}
 .cart-list{display:grid;gap:10px}
 .cart-item{border:1px solid var(--line);border-radius:14px;padding:13px;background:#fff}
@@ -119,7 +119,7 @@ tr:last-child td{border-bottom:0}
 .cart-top small{color:var(--muted)}
 .cart-controls{display:grid;grid-template-columns:120px 1fr auto;gap:8px;align-items:end;margin-top:10px}
 .cart-discount{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px}
-.selected-count{font-size:12px;color:var(--muted);font-weight:700}
+.selected-count{font-size:13px;color:var(--text);font-weight:800;background:#f3f4f6;border-radius:12px;padding:12px;margin:10px 0}.picker-help{font-size:13px;line-height:1.5;color:var(--muted);margin:0 0 10px}.picker-next{width:100%;margin:2px 0 12px;min-height:46px}.welcome-toast{position:fixed;z-index:100;top:84px;left:50%;transform:translateX(-50%);width:min(440px,calc(100% - 28px));padding:13px 16px;background:#111827;color:#fff;border-radius:14px;box-shadow:0 12px 35px rgba(17,24,39,.2);display:flex;align-items:flex-start;gap:10px;animation:welcome-in .35s ease-out}.welcome-toast strong{display:block;font-size:14px;margin-bottom:3px}.welcome-toast span{display:block;font-size:12px;line-height:1.45;color:#d1d5db}@keyframes welcome-in{from{opacity:0;transform:translate(-50%,-8px)}to{opacity:1;transform:translate(-50%,0)}}@media(max-width:560px){.welcome-toast{top:72px}.picker-item{padding:12px}.picker-item .btn{min-width:86px}}
 @media(max-width:560px){
   .cart-controls{grid-template-columns:1fr auto}
   .cart-controls .cart-price{grid-column:1/-1}
@@ -247,6 +247,9 @@ button:focus-visible,.btn:focus-visible{outline:3px solid rgba(37,99,235,.35);ou
 </style>
 </head>
 <body>
+<div class="welcome-toast" id="dailyWelcome" role="status" aria-live="polite">
+  <div aria-hidden="true">✦</div><div><strong>Bon courage avec MonStock !</strong><span id="dailyWelcomeText">Chaque petit progrès compte. Vous avancez pas à pas.</span></div>
+</div>
 <div class="app">
   <aside class="sidebar">
     <div class="logo"><strong>Mon Stock</strong><span>Gestion simple du stock</span></div>
@@ -372,9 +375,10 @@ button:focus-visible,.btn:focus-visible{outline:3px solid rgba(37,99,235,.35);ou
               <label>Rechercher un produit</label>
               <input id="entrySearch" placeholder="Nom, catégorie ou format...">
             </div>
-            <div class="selected-count" id="entrySelectedCount">0 produit sélectionné</div>
+            <p class="picker-help">Touchez <strong>Ajouter</strong> à côté de chaque produit reçu. Vous pourrez ensuite saisir les quantités.</p>
+            <div class="selected-count" id="entrySelectedCount">Aucun produit choisi</div>
+            <button class="btn picker-next" data-enext>Continuer vers les quantités →</button>
             <div class="picker-list" id="entryProductList"></div>
-            <div class="wizard-actions"><span></span><button class="btn" data-enext>Continuer</button></div>
           </div>
 
           <div class="wizard-panel" data-entry-panel="2">
@@ -409,9 +413,10 @@ button:focus-visible,.btn:focus-visible{outline:3px solid rgba(37,99,235,.35);ou
               <label>Rechercher un produit</label>
               <input id="exitSearch" placeholder="Nom, catégorie ou format...">
             </div>
-            <div class="selected-count" id="exitSelectedCount">0 produit sélectionné</div>
+            <p class="picker-help">Touchez <strong>+</strong> pour ajouter les produits qui sortent du stock. Le stock disponible est indiqué sous chaque nom.</p>
+            <div class="selected-count" id="exitSelectedCount"><span>Aucun produit choisi</span><strong>0 F</strong></div>
+            <button class="btn picker-next" data-xnext>Continuer vers les détails →</button>
             <div class="picker-list" id="exitProductList"></div>
-            <div class="wizard-actions"><span></span><button class="btn" data-xnext>Continuer</button></div>
           </div>
 
           <div class="wizard-panel" data-exit-panel="2">
@@ -1032,6 +1037,30 @@ window.addEventListener('online',()=>{if(cloudReady){setSyncStatus('Reconnexion�
 window.addEventListener('offline',()=>{if(cloudReady)setSyncStatus('Hors ligne')});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&cloudReady&&!cloudDirty&&!cloudSyncing)pullCloudData(false)});
 
+function showDailyWelcome(){
+ const messages=[
+  "Chaque petit progrès compte. Vous avancez pas à pas.",
+  "Un stock bien suivi, c'est une entreprise qui avance. Bon travail !",
+  "Prenez les choses une par une : vous êtes capable d'y arriver.",
+  "Chaque effort d'aujourd'hui prépare les réussites de demain.",
+  "Vous faites avancer votre activité. Continuez à votre rythme.",
+  "Un petit pas bien fait vaut mieux qu'une grande hésitation.",
+  "Votre travail compte. Gardez le cap et bon courage !",
+  "Avec de la régularité, les choses deviennent plus simples.",
+  "Vous n'avez pas besoin de tout faire d'un coup. Avancez tranquillement.",
+  "Aujourd'hui est une nouvelle occasion de bien gérer votre activité.",
+  "Votre sérieux d'aujourd'hui construit votre réussite de demain.",
+  "Continuez, même les petites avancées sont importantes.",
+  "MonStock est là pour vous aider. Faites une chose à la fois.",
+  "Bon courage ! Vous êtes en train de bâtir quelque chose de solide."
+ ];
+ const start=new Date(new Date().getFullYear(),0,0);
+ const day=Math.floor((new Date()-start)/86400000);
+ const el=document.getElementById('dailyWelcomeText');
+ if(el)el.textContent=messages[(day-1)%messages.length];
+ const toast=document.getElementById('dailyWelcome');
+ if(toast){window.setTimeout(()=>{toast.style.transition='opacity .45s ease, transform .45s ease';toast.style.opacity='0';toast.style.transform='translate(-50%,-8px)';window.setTimeout(()=>toast.remove(),500)},6500);}
+}
 function positiveInt(v){const n=Number(v);return Number.isInteger(n)&&n>0?n:null}
 function nonNegativeInt(v){const n=Number(v);return Number.isInteger(n)&&n>=0?n:null}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
@@ -1226,10 +1255,10 @@ function renderEntryPicker(){
    const chosen=entryCart.some(i=>i.productId===p.id);
    return `<div class="picker-item">
      <div class="info"><strong>${esc(p.name)}</strong><small>${esc(p.format||'—')} • Stock ${p.stock}</small></div>
-     <button class="btn ${chosen?'secondary':''} small" data-entry-add="${p.id}">${chosen?'Retirer':'Ajouter'}</button>
+     <button class="btn ${chosen?'secondary':''} small" data-entry-add="${p.id}">${chosen?'✓ Ajouté':'＋ Ajouter'}</button>
    </div>`;
  }).join(''):'<div class="empty">Aucun produit trouvé.</div>';
- $('entrySelectedCount').textContent=entryCart.length+' produit'+(entryCart.length>1?'s':'')+' sélectionné'+(entryCart.length>1?'s':'');
+ $('entrySelectedCount').textContent=entryCart.length ? (entryCart.length+' produit'+(entryCart.length>1?'s':'')+' choisi'+(entryCart.length>1?'s':'')) : 'Aucun produit choisi pour le moment';
  document.querySelectorAll('[data-entry-add]').forEach(b=>b.onclick=()=>{
    const id=b.dataset.entryAdd,idx=entryCart.findIndex(i=>i.productId===id);
    if(idx>=0) entryCart.splice(idx,1); else entryCart.push({productId:id,qty:1});
@@ -1251,7 +1280,7 @@ function renderExitPicker(){
  }).join(''):'<div class="empty">Aucun produit trouvé.</div>';
  const totalQty=exitCart.reduce((a,i)=>a+i.qty,0);
  const total=exitCart.reduce((a,i)=>a+cartItemTotal(i).total,0);
- $('exitSelectedCount').innerHTML=`<span>${totalQty} article${totalQty>1?'s':''}</span><strong>${money(total)}</strong>`;
+ $('exitSelectedCount').innerHTML=totalQty?`<span>${totalQty} article${totalQty>1?'s':''} choisi${totalQty>1?'s':''}</span><strong>${money(total)}</strong>`:'<span>Aucun produit choisi pour le moment</span><strong>0 F</strong>';
  document.querySelectorAll('[data-pos-plus]').forEach(b=>b.onclick=()=>{
    const id=b.dataset.posPlus,p=productById(id);if(!p||Number(p.stock)<=0)return;
    const item=exitCart.find(i=>i.productId===id);
@@ -2025,6 +2054,7 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+showDailyWelcome();
 renderAll();
 initCloud();
 })();
