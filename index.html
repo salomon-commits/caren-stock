@@ -195,6 +195,28 @@ button:focus-visible,.btn:focus-visible{outline:3px solid rgba(37,99,235,.35);ou
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}
 
 }
+
+/* Navigation mobile : quatre actions fréquentes et un panneau « Plus ». */
+.mobile-nav{display:none}
+.mobile-more-backdrop[hidden],.mobile-more-panel[hidden]{display:none!important}
+.mobile-more-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.38);z-index:39;backdrop-filter:blur(2px)}
+.mobile-more-panel{position:fixed;left:10px;right:10px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:40;background:#fff;border:1px solid #e6eaf0;border-radius:22px;padding:10px 14px 14px;box-shadow:0 18px 55px rgba(15,23,42,.2);max-height:min(70vh,520px);overflow:auto}
+.mobile-more-handle{width:36px;height:4px;border-radius:99px;background:#d7dce5;margin:2px auto 12px}
+.mobile-more-heading{display:flex;align-items:center;justify-content:space-between;padding:2px 2px 10px;font-size:16px}
+.mobile-more-heading button{border:0;background:#f1f4f8;border-radius:10px;width:36px;height:36px;font-size:16px}
+.mobile-more-panel>button{display:flex;width:100%;flex-direction:column;align-items:flex-start;gap:4px;padding:13px 12px;border:0;border-top:1px solid #eef1f5;background:#fff;text-align:left;border-radius:10px;font-weight:750;color:#172033}
+.mobile-more-panel>button small{font-size:12px;font-weight:500;color:#697386}
+.mobile-more-panel>button:active{background:#f4f7fb}
+@media(max-width:900px){
+ .mobile-nav{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));position:fixed;left:0;right:0;bottom:0;z-index:41;background:rgba(255,255,255,.97);border-top:1px solid #e5e9f0;padding:5px 6px calc(5px + env(safe-area-inset-bottom));min-height:64px;gap:3px;box-shadow:0 -5px 20px rgba(15,23,42,.07);backdrop-filter:blur(14px)}
+ .mobile-nav button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:0;background:transparent;color:#667085;border-radius:12px;padding:4px 2px;min-height:52px;font-size:10px;font-weight:750;white-space:nowrap}
+ .mobile-nav button.active{background:#eef2ff;color:#253b80}
+ .mobile-nav .nav-icon{font-size:20px;line-height:1;font-weight:600}
+ .content{padding-bottom:calc(88px + env(safe-area-inset-bottom))}
+ .topbar{position:sticky;top:0;z-index:25;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);border-bottom:1px solid #edf0f4}
+}
+@media(min-width:901px){.mobile-more-backdrop,.mobile-more-panel{display:none!important}}
+
 </style>
 </head>
 <body>
@@ -537,13 +559,22 @@ button:focus-visible,.btn:focus-visible{outline:3px solid rgba(37,99,235,.35);ou
   </div>
 </div>
 
-<nav class="mobile-nav">
-  <button data-page="dashboard" class="active">Accueil</button>
-  <button data-page="products">Produits</button>
-  <button data-page="entry">Entrée</button>
-  <button data-page="exit">Sortie</button>
-  <button data-page="history">Historique</button>
+<nav class="mobile-nav" aria-label="Navigation principale">
+  <button data-page="dashboard" class="active"><span class="nav-icon">⌂</span><span>Accueil</span></button>
+  <button data-page="products"><span class="nav-icon">▦</span><span>Produits</span></button>
+  <button data-page="entry"><span class="nav-icon">＋</span><span>Entrée</span></button>
+  <button data-page="exit"><span class="nav-icon">↗</span><span>Sortie</span></button>
+  <button type="button" id="mobileMoreBtn" aria-expanded="false" aria-controls="mobileMorePanel"><span class="nav-icon">☰</span><span>Plus</span></button>
 </nav>
+<div class="mobile-more-backdrop" id="mobileMoreBackdrop" hidden></div>
+<section class="mobile-more-panel" id="mobileMorePanel" aria-label="Autres rubriques" hidden>
+  <div class="mobile-more-handle"></div>
+  <div class="mobile-more-heading"><strong>Autres rubriques</strong><button type="button" id="mobileMoreClose" aria-label="Fermer">✕</button></div>
+  <button data-page="history"><span>Historique</span><small>Entrées et sorties</small></button>
+  <button data-page="accounting"><span>Mini comptabilité</span><small>Ventes, dépenses et résultat</small></button>
+  <button data-page="assistant"><span>Mini IA</span><small>Analyse du stock</small></button>
+  <button data-page="settings"><span>Sauvegarde et paramètres</span><small>Exporter ou gérer les données</small></button>
+</section>
 
 <script>
 (() => {
@@ -649,35 +680,11 @@ function load(){
 function cloneData(v=data){return JSON.parse(JSON.stringify(v))}
 
 function normalizeStockState(source){
- const draft=cloneData(source);
- let changed=false;
- for(const p of draft.products){
-   const indexed=draft.movements
-     .map((m,index)=>({m,index}))
-     .filter(x=>x.m.productId===p.id)
-     .sort((a,b)=>{
-       const ta=new Date(a.m.date).getTime(),tb=new Date(b.m.date).getTime();
-       if(ta!==tb)return ta-tb;
-       return b.index-a.index;
-     });
-   if(!indexed.length)continue;
-
-   const first=indexed[0].m;
-   const firstQty=Number(first.qty)||0;
-   const firstAfter=Number(first.stockAfter)||0;
-   let running=first.type==='IN'?firstAfter-firstQty:firstAfter+firstQty;
-   if(!Number.isFinite(running))continue;
-   running=Math.max(0,running);
-
-   for(const entry of indexed){
-     const m=entry.m,q=Number(m.qty)||0;
-     running=m.type==='IN'?running+q:running-q;
-     running=Math.max(0,running);
-     if(Number(m.stockAfter)!==running){m.stockAfter=running;changed=true}
-   }
-   if(Number(p.stock)!==running){p.stock=running;changed=true}
- }
- return {data:draft,changed};
+ // Le stock courant enregistré dans products.stock est la source de vérité.
+ // Ne jamais le recalculer à partir de mouvements historiques : les dates identiques,
+ // l'ordre de synchronisation ou les mouvements importés peuvent sinon faire varier le stock
+ // à chaque actualisation. Les mouvements restent un historique, pas un recalcul automatique.
+ return {data:cloneData(source),changed:false};
 }
 function save(next=data){
  try{
@@ -1003,6 +1010,24 @@ function gotoPage(page){
  if(page==='exit') resetExit();
  window.scrollTo({top:0,behavior:'smooth'});
 }
+
+// Panneau « Plus » pour les rubriques secondaires sur téléphone.
+const mobileMoreBtn=$('mobileMoreBtn'),mobileMorePanel=$('mobileMorePanel'),mobileMoreBackdrop=$('mobileMoreBackdrop');
+function closeMobileMore(){
+ if(!mobileMorePanel)return;
+ mobileMorePanel.hidden=true;mobileMoreBackdrop.hidden=true;mobileMoreBtn.setAttribute('aria-expanded','false');
+}
+function openMobileMore(){
+ mobileMorePanel.hidden=false;mobileMoreBackdrop.hidden=false;mobileMoreBtn.setAttribute('aria-expanded','true');
+}
+if(mobileMoreBtn){
+ mobileMoreBtn.addEventListener('click',()=>mobileMorePanel.hidden?openMobileMore():closeMobileMore());
+ $('mobileMoreClose').addEventListener('click',closeMobileMore);
+ mobileMoreBackdrop.addEventListener('click',closeMobileMore);
+ mobileMorePanel.querySelectorAll('[data-page]').forEach(b=>b.addEventListener('click',()=>{closeMobileMore();gotoPage(b.dataset.page)}));
+ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMobileMore()});
+}
+
 document.querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>gotoPage(b.dataset.page));
 document.querySelectorAll('[data-goto]').forEach(b=>b.onclick=()=>gotoPage(b.dataset.goto));
 
