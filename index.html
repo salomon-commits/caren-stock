@@ -217,6 +217,33 @@ button:focus-visible,.btn:focus-visible{outline:3px solid rgba(37,99,235,.35);ou
 }
 @media(min-width:901px){.mobile-more-backdrop,.mobile-more-panel{display:none!important}}
 
+
+/* Boutique mobile : vente rapide, cartes compactes et actions immédiates */
+.pos-product{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;border:1px solid var(--line);border-radius:14px;background:#fff;min-width:0}
+.pos-product.is-selected{border-color:#2563eb;background:#f5f8ff}
+.pos-product.is-out{opacity:.65}
+.pos-product-info{display:grid;gap:4px;min-width:0}
+.pos-product-info strong{font-size:14px;line-height:1.3;overflow-wrap:anywhere}
+.pos-product-info b{font-size:15px;color:var(--primary,#1d4ed8)}
+.pos-product-info small{font-size:11px;color:var(--muted)}
+.pos-qty{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.pos-qty button{width:38px;height:38px;border:0;border-radius:12px;background:#172554;color:white;font-size:23px;font-weight:700;display:grid;place-items:center}
+.pos-qty button:disabled{background:#d1d5db;color:#6b7280}
+.pos-qty span{min-width:18px;text-align:center;font-weight:800}
+#exitSelectedCount{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;background:#eef2ff;color:#1e293b;margin-top:10px}
+#exitProductList{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;max-height:none;overflow:visible}
+#exitProductList .pos-product{align-items:flex-start;flex-direction:column;min-height:130px}
+#exitProductList .pos-qty{width:100%;justify-content:flex-end;margin-top:auto}
+#exitSearch{position:sticky;top:66px;z-index:5;background:#fff}
+@media(max-width:560px){
+ #exitProductList{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ #exitProductList .pos-product{padding:10px;min-height:142px}
+ .pos-product-info strong{font-size:12px}.pos-product-info b{font-size:14px}
+ .pos-qty{gap:6px}.pos-qty button{width:36px;height:36px}
+ .wizard-actions{position:sticky;bottom:72px;background:#fff;padding:10px 0;z-index:8}
+ #page-exit .wizard-panel[data-exit-panel="1"]{padding-bottom:8px}
+}
+
 </style>
 </head>
 <body>
@@ -592,27 +619,23 @@ let cloudSyncTimer=null;
 let cloudRefreshTimer=null;
 
 const BASE_CATALOG = [
-  {id:'cat-gel-lactea-opal-500',name:'Gel Douche Lactea Opal',category:'Gel & Savon',format:'500 ml',price:25000},
-  {id:'cat-savon-noir-500',name:'Savon Noir',category:'Gel & Savon',format:'500 g',price:16000},
-  {id:'cat-savon-noir-250',name:'Savon Noir',category:'Gel & Savon',format:'250 g',price:9000},
-  {id:'cat-savon-visage',name:'Savon Visage',category:'Gel & Savon',format:'',price:8000},
-  {id:'cat-lait-lactea-opal-300',name:'Lait Lactea Opal',category:'Lait & Crème',format:'300 ml',price:15500},
-  {id:'cat-lait-lum-300',name:'Lait Lum',category:'Lait & Crème',format:'300 ml',price:15000},
-  {id:'cat-creme-visage-nuit-30',name:'Crème Visage Nuit',category:'Lait & Crème',format:'30 g',price:9000},
-  {id:'cat-creme-visage-jour-30',name:'Crème Visage Jour',category:'Lait & Crème',format:'30 g',price:5000},
-  {id:'cat-beurre-adulte-400',name:'Crème au Beurre Adulte',category:'Beurre',format:'400 g',price:15000},
-  {id:'cat-beurre-enfant-300',name:'Crème au Beurre Enfant',category:'Beurre',format:'300 g',price:12000},
-  {id:'cat-creme-glow-300',name:'Crème Glow Hydratante Corporelle',category:'Beurre',format:'300 g',price:12000},
-  {id:'cat-huile-traditionnelle-250',name:'Huile Traditionnelle',category:'Huile',format:'250 ml',price:12000},
-  {id:'cat-huile-nacree-100',name:'Huile Nacrée (Pailletée)',category:'Huile',format:'100 ml',price:12000},
-  {id:'cat-gamme-lactea',name:'Gamme Lactea',category:'Gamme',format:'',price:61000},
-  {id:'cat-gamme-teint-clair',name:'Gamme Teint Clair',category:'Gamme',format:'',price:51000},
-  {id:'cat-mini-gamme-teint-clair',name:'Mini Gamme Teint Clair',category:'Gamme',format:'',price:44000},
-  {id:'cat-gamme-marron-clair',name:'Gamme Marron Clair',category:'Gamme',format:'',price:51000},
-  {id:'cat-mini-gamme-marron-clair',name:'Mini Gamme Marron Clair',category:'Gamme',format:'',price:44000},
-  {id:'cat-kit-visage',name:'Kit Visage',category:'Gamme',format:'',price:20000},
-  {id:'cat-box-nourrice',name:'Box Nourrice & Femme Enceinte',category:'Box',format:'',price:40000},
-  {id:'cat-box-cadeau-plus-mot',name:'Box Cadeau Plus Mot',category:'Box',format:'',price:50000}
+  {id:'official-creme-luxury',name:'Crème Luxury',category:'Crèmes',format:'',price:40000},
+  {id:'official-gel-luxurious',name:'Gel Luxurious',category:'Gels',format:'',price:22000},
+  {id:'official-savon-pinkie',name:'Savon Pinkie',category:'Savons',format:'',price:17000},
+  {id:'official-savon-illuminateur',name:'Savon Illuminateur',category:'Savons',format:'',price:16000},
+  {id:'official-creme-beurre',name:'Crème au beurre',category:'Crèmes',format:'',price:15000},
+  {id:'official-savon-noir',name:'Savon noir',category:'Savons',format:'',price:14000},
+  {id:'official-lait-lactea',name:'Lait Lactea',category:'Laits',format:'',price:14000},
+  {id:'official-gommage',name:'Gommage',category:'Soins',format:'',price:12000},
+  {id:'official-huile-traditionnelle',name:'Huile traditionnelle',category:'Huiles',format:'',price:12000},
+  {id:'official-recharge-huile-traditionnelle',name:'Recharge huile traditionnelle',category:'Huiles',format:'10 ml',price:10000},
+  {id:'official-creme-beurre-plus',name:'Crème au beurre +',category:'Crèmes',format:'',price:9000},
+  {id:'official-creme-glow',name:'Crème Glow',category:'Crèmes',format:'',price:9000},
+  {id:'official-creme-beurre-enfant',name:'Crème au beurre enfant',category:'Crèmes',format:'',price:9000},
+  {id:'official-creme-visage-eclaircissante',name:'Crème visage éclaircissante',category:'Visage',format:'',price:8000},
+  {id:'official-creme-visage-marron-caramel',name:'Crème visage marron caramel',category:'Visage',format:'',price:7000},
+  {id:'official-savon-visage',name:'Savon visage',category:'Visage',format:'',price:7000},
+  {id:'official-moisturizing-face-cream',name:'Moisturizing face cream',category:'Visage',format:'',price:5000}
 ];
 
 let data=load();
@@ -643,38 +666,56 @@ function load(){
 
  if(!Array.isArray(x.accounts)) x.accounts=[];
 
- if(x.priceCatalogVersion!==1){
-   const normalize=v=>String(v||'').trim().toLowerCase();
+ const normalize=v=>String(v||'').trim().toLowerCase().replace(/\\s+/g,' ');
+ const aliases={
+   'crème luxury':['creme luxury','luxury cream'],
+   'gel luxurious':['gel luxurious','gel douche lactea opal'],
+   'savon pinkie':['sacon pinkie','savon pinkie','pinkie'],
+   'savon illuminateur':['savon illuminateur'],
+   'crème au beurre':['crème au beurre','creme au beurre','crème au beurre adulte','creme au beurre adulte'],
+   'savon noir':['savon noir'],
+   'lait lactea':['lait lactea','lait lactea opal'],
+   'gommage':['gommage'],
+   'huile traditionnelle':['huile traditionnelle'],
+   'recharge huile traditionnelle':['recharge huile traditionnelle'],
+   'crème au beurre +':['crème au beurre +','creme au beurre +','crème au beurre plus'],
+   'crème glow':['crème glow','creme glow','crème glow hydratante corporelle'],
+   'crème au beurre enfant':['crème au beurre enfant','creme au beurre enfant'],
+   'crème visage éclaircissante':['crème visage éclaircissante','crème visage jour','crème visage nuit','creme visage eclaircissante'],
+   'crème visage marron caramel':['crème visage marron caramel'],
+   'savon visage':['savon visage'],
+   'moisturizing face cream':['moisturizing face cream']
+ };
+ const matchesOfficial=(p,item)=>{
+   const n=normalize(p.name), target=normalize(item.name);
+   const options=aliases[target]||[target];
+   return options.some(a=>normalize(a)===n) ||
+     (target==='savon noir'&&n==='savon noir') ||
+     (target==='crème au beurre'&&n==='crème au beurre');
+ };
+ if(x.priceCatalogVersion!==2){
    BASE_CATALOG.forEach(item=>{
-     const match=x.products.find(p=>normalize(p.name)===normalize(item.name)&&normalize(p.format)===normalize(item.format));
+     let match=x.products.find(p=>matchesOfficial(p,item));
      if(match){
+       match.name=item.name;
        match.category=item.category;
        match.format=item.format;
        match.price=item.price;
      }
    });
-   x.priceCatalogVersion=1;
-   localStorage.setItem(KEY,JSON.stringify(x));
+   x.priceCatalogVersion=2;
  }
-
- if(x.catalogVersion!==1){
-   const key=p=>(String(p.name||'').trim().toLowerCase()+'|'+String(p.format||'').trim().toLowerCase());
-   const existing=new Set(x.products.map(key));
-
+ if(x.catalogVersion!==2){
    BASE_CATALOG.forEach(item=>{
-     if(!existing.has(key(item))){
-       x.products.push({
-         ...item,
-         stock:0,
-         threshold:5,
-         createdAt:new Date().toISOString()
-       });
+     let match=x.products.find(p=>matchesOfficial(p,item));
+     if(!match){
+       x.products.push({...item,stock:0,threshold:5,createdAt:new Date().toISOString()});
      }
    });
-
-   x.catalogVersion=1;
-   localStorage.setItem(KEY,JSON.stringify(x));
+   x.catalogVersion=2;
  }
+ try{localStorage.setItem(KEY,JSON.stringify(x))}catch(_){}
+
  return x;
 }
 function cloneData(v=data){return JSON.parse(JSON.stringify(v))}
@@ -1116,16 +1157,27 @@ function renderExitPicker(){
  const q=$('exitSearch')?.value||'';
  const items=data.products.filter(p=>matchesProduct(p,q));
  $('exitProductList').innerHTML=items.length?items.map(p=>{
-   const chosen=exitCart.some(i=>i.productId===p.id);
-   return `<div class="picker-item">
-     <div class="info"><strong>${esc(p.name)}</strong><small>${esc(p.format||'—')} • ${money(p.price)} • Stock ${p.stock}</small></div>
-     <button class="btn ${chosen?'secondary':''} small" data-exit-add="${p.id}">${chosen?'Retirer':'Ajouter'}</button>
-   </div>`;
+   const item=exitCart.find(i=>i.productId===p.id);
+   const qty=item?item.qty:0;
+   const unavailable=Number(p.stock)<=0;
+   return `<article class="pos-product ${qty?'is-selected':''} ${unavailable?'is-out':''}">
+     <div class="pos-product-info"><strong>${esc(p.name)}</strong><b>${money(p.price)}</b><small>${unavailable?'Stock à renseigner':('En stock : '+p.stock)}</small></div>
+     <div class="pos-qty">${qty?`<button type="button" aria-label="Retirer une unité" data-pos-minus="${p.id}">−</button><span>${qty}</span>`:''}<button type="button" aria-label="Ajouter une unité" data-pos-plus="${p.id}" ${unavailable?'disabled':''}>+</button></div>
+   </article>`;
  }).join(''):'<div class="empty">Aucun produit trouvé.</div>';
- $('exitSelectedCount').textContent=exitCart.length+' produit'+(exitCart.length>1?'s':'')+' sélectionné'+(exitCart.length>1?'s':'');
- document.querySelectorAll('[data-exit-add]').forEach(b=>b.onclick=()=>{
-   const id=b.dataset.exitAdd,idx=exitCart.findIndex(i=>i.productId===id);
-   if(idx>=0) exitCart.splice(idx,1); else exitCart.push({productId:id,qty:1,discountType:'NONE',discountValue:0});
+ const totalQty=exitCart.reduce((a,i)=>a+i.qty,0);
+ const total=exitCart.reduce((a,i)=>a+cartItemTotal(i).total,0);
+ $('exitSelectedCount').innerHTML=`<span>${totalQty} article${totalQty>1?'s':''}</span><strong>${money(total)}</strong>`;
+ document.querySelectorAll('[data-pos-plus]').forEach(b=>b.onclick=()=>{
+   const id=b.dataset.posPlus,p=productById(id);if(!p||Number(p.stock)<=0)return;
+   const item=exitCart.find(i=>i.productId===id);
+   if(item){if(item.qty>=Number(p.stock)){alert('Stock insuffisant.');return}item.qty++}
+   else exitCart.push({productId:id,qty:1,discountType:'NONE',discountValue:0});
+   renderExitPicker();
+ });
+ document.querySelectorAll('[data-pos-minus]').forEach(b=>b.onclick=()=>{
+   const id=b.dataset.posMinus,item=exitCart.find(i=>i.productId===id);if(!item)return;
+   item.qty--;if(item.qty<=0)exitCart=exitCart.filter(i=>i.productId!==id);
    renderExitPicker();
  });
 }
